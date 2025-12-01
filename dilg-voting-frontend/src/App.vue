@@ -111,6 +111,27 @@ const isAdminContext = computed(() => {
     linear-gradient(180deg, #f9fafb 0%, #f1f4f8 100%);
 }
 
+/* Accessibility: larger default sizing for elderly users */
+body {
+  font-size: 18px;
+  line-height: 1.6;
+}
+.text-xs {
+  font-size: 0.95rem !important;
+}
+.text-sm {
+  font-size: 1.05rem !important;
+}
+input,
+select,
+textarea {
+  font-size: 1rem !important;
+  padding: 0.55rem 0.75rem !important;
+}
+button {
+  font-size: 1rem !important;
+}
+
 .header-bar {
   background: linear-gradient(90deg, rgba(15, 35, 66, 0.08), rgba(196, 151, 60, 0.12), rgba(255, 255, 255, 0.92));
   backdrop-filter: blur(10px);
