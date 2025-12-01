@@ -33,10 +33,10 @@ def generate_pin(length: int = 6):
 class Election(models.Model):
     name = models.CharField(max_length=150)
     description = models.TextField(blank=True)
-    nomination_start = models.DateTimeField()
-    nomination_end = models.DateTimeField()
-    voting_start = models.DateTimeField()
-    voting_end = models.DateTimeField()
+    nomination_start = models.DateTimeField(null=True, blank=True)
+    nomination_end = models.DateTimeField(null=True, blank=True)
+    voting_start = models.DateTimeField(null=True, blank=True)
+    voting_end = models.DateTimeField(null=True, blank=True)
     results_at = models.DateTimeField(blank=True, null=True)
     results_published = models.BooleanField(default=False)
     results_published_at = models.DateTimeField(blank=True, null=True)
@@ -52,15 +52,28 @@ class Election(models.Model):
 
     # Phase helpers
     def is_nomination_open(self):
+        if not self.nomination_start or not self.nomination_end:
+            return False
         now = timezone.now()
         return self.nomination_start <= now <= self.nomination_end
 
     def is_voting_open(self):
+        if not self.voting_start or not self.voting_end:
+            return False
         now = timezone.now()
         return self.voting_start <= now <= self.voting_end
 
     @property
     def phase(self):
+        if not all(
+            [
+                self.nomination_start,
+                self.nomination_end,
+                self.voting_start,
+                self.voting_end,
+            ]
+        ):
+            return "unconfigured"
         now = timezone.now()
         if self.nomination_start and now < self.nomination_start:
             return "upcoming"

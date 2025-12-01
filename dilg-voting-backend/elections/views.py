@@ -759,6 +759,28 @@ def admin_reset_election(request):
         v.is_active = True
         v.save(update_fields=["has_voted", "session_token", "is_active"])
 
+    # Clear the election timeline and deactivate until new dates are set.
+    election.nomination_start = None
+    election.nomination_end = None
+    election.voting_start = None
+    election.voting_end = None
+    election.results_at = None
+    election.results_published = False
+    election.results_published_at = None
+    election.is_active = False
+    election.save(
+        update_fields=[
+            "nomination_start",
+            "nomination_end",
+            "voting_start",
+            "voting_end",
+            "results_at",
+            "results_published",
+            "results_published_at",
+            "is_active",
+        ]
+    )
+
     return Response(
         {
             "message": "Election data reset.",
