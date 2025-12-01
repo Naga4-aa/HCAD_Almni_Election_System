@@ -1,0 +1,162 @@
+﻿<!-- src/views/ResultsView.vue -->
+<script setup>
+import { ref, computed, onMounted, onUnmounted } from 'vue'
+import api from '../api'
+import { countdownTo, formatDateTime, toMs } from '../utils/time'
+
+const results = ref(null)
+const election = ref(null)
+const loading = ref(true)
+const error = ref('')
+const now = ref(Date.now())
+
+const hasActiveElection = computed(() => !!election.value && election.value.is_active)
+const hasTimeline = computed(() => {
+  const e = election.value
+  if (!e || !e.is_active) return false
+  const required = [e.nomination_start, e.nomination_end, e.voting_start, e.voting_end]
+  return required.every((v) => {
+    const ts = toMs(v)
+    return ts !== null && !Number.isNaN(ts)
+  })
+})
+
+const resultsCountdown = computed(() => {
+  if (!hasTimeline.value || !election.value?.results_at) return null
+  const target = toMs(election.value.results_at)
+  if (!target) return null
+  return countdownTo(target, now.value)
+})
+
+const resultsEta = computed(() => {
+  if (!hasTimeline.value || !election.value?.results_at) return null
+  return formatDateTime(election.value.results_at)
+})
+
+const loadResults = async () => {
+  loading.value = true
+  error.value = ''
+  try {
+    const res = await api.get('elections/results/')
+    if (res.data?.published) {
+      results.value = res.data
+    } else {
+      results.value = null
+    }
+  } catch (err) {
+    error.value = err.response?.data?.error || 'Failed to load results.'
+  } finally {
+    loading.value = false
+  }
+}
+
+const loadElection = async () => {
+  try {
+    const res = await api.get('elections/current/')
+    election.value = res.data?.election || null
+  } catch (err) {
+    election.value = null
+  }
+}
+
+let timerId
+let refreshing = false
+
+const tick = async () => {
+  now.value = Date.now()
+  if (refreshing) return
+  refreshing = true
+  try {
+    await Promise.all([loadResults(), loadElection()])
+    if (!hasTimeline.value) {
+      results.value = null
+    }
+  } catch (e) {
+    // ignore transient refresh errors
+  } finally {
+    refreshing = false
+  }
+}
+
+onMounted(async () => {
+  await Promise.all([loadResults(), loadElection()])
+  if (!hasTimeline.value) {
+    results.value = null
+  }
+  timerId = setInterval(tick, 15000)
+})
+
+onUnmounted(() => {
+  if (timerId) clearInterval(timerId)
+})
+</script>
+
+<template>
+  <div class="space-y-4">
+    <div class="bg-white/90 rounded-2xl border border-slate-200 p-5 shadow-sm">
+      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+        <div>
+          <p class="text-xs uppercase tracking-wide text-emerald-600 font-semibold">Results</p>
+          <h2 class="text-lg font-semibold">Official results</h2>
+          <p class="text-xs text-slate-500">
+            <span v-if="results">Published {{ formatDateTime(results?.published_at) }}</span>
+            <span v-else-if="loading">Checking publication status...</span>
+            <span v-else>Results will appear here once COMELEC publishes them.</span>
+          </p>
+          <p v-if="!results && resultsEta" class="text-[11px] text-amber-700 mt-1">
+            Expected at {{ resultsEta }}
+            <span v-if="resultsCountdown">(in {{ resultsCountdown.text }})</span>
+          </p>
+        </div>
+        <button
+          class="px-3 py-1.5 rounded-lg text-xs border border-slate-200 hover:bg-emerald-50"
+          @click="loadResults"
+        >
+          Refresh
+        </button>
+      </div>
+    </div>
+
+    <div v-if="error" class="text-sm text-rose-600">{{ error }}</div>
+    <div v-else-if="loading" class="text-sm text-slate-600">Loading...</div>
+
+    <div v-else-if="results" class="grid gap-4 md:grid-cols-2">
+      <div
+        v-for="pos in results.positions || []"
+        :key="pos.position_id"
+        class="bg-white/90 rounded-2xl border border-slate-200 p-4 shadow-sm"
+      >
+        <div class="flex items-center justify-between mb-2">
+          <h3 class="text-sm font-semibold text-slate-800">{{ pos.position }}</h3>
+          <span class="text-[11px] text-slate-500">{{ pos.candidates?.length || 0 }} candidate(s)</span>
+        </div>
+        <ul class="space-y-3 text-sm text-slate-700">
+          <li
+            v-for="cand in pos.candidates"
+            :key="cand.id"
+            class="space-y-1"
+          >
+            <div class="flex items-center justify-between">
+              <div>
+                <p class="font-semibold" :class="{ 'text-emerald-700': cand.winner }">{{ cand.full_name }}</p>
+                <p class="text-[11px] text-slate-500">Batch {{ cand.batch_year }} - {{ cand.campus_chapter || 'Campus/Chapter not set' }}</p>
+              </div>
+              <div class="text-right">
+                <p class="text-sm font-semibold text-slate-800">{{ cand.votes }} vote(s)</p>
+                <p v-if="cand.winner" class="text-[11px] text-emerald-700 font-semibold">Winner</p>
+              </div>
+            </div>
+            <div class="h-2.5 rounded-full bg-slate-100 overflow-hidden">
+              <div
+                class="h-full rounded-full bg-gradient-to-r from-[var(--hcad-gold)] to-[var(--hcad-navy)] transition-all duration-300"
+                :style="{ width: (Math.max(...pos.candidates.map(c => c.votes), 1) ? (cand.votes / Math.max(...pos.candidates.map(c => c.votes), 1)) * 100 : 0) + '%' }"
+              ></div>
+            </div>
+          </li>
+        </ul>
+      </div>
+    </div>
+
+    <div v-else class="text-sm text-slate-600">Results not yet published.</div>
+  </div>
+</template>
