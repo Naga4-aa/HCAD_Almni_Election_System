@@ -9,6 +9,7 @@ from .models import (
     Vote,
     Nomination,
     ElectionReminder,
+    Notification,
 )
 
 
@@ -213,3 +214,10 @@ class ElectionReminderSerializer(serializers.ModelSerializer):
         model = ElectionReminder
         fields = ["id", "election", "remind_at", "note", "created_at"]
         read_only_fields = ["created_at"]
+
+
+class NotificationSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Notification
+        fields = ["id", "type", "message", "is_read", "is_hidden", "created_at"]
+        read_only_fields = ["id", "created_at"]

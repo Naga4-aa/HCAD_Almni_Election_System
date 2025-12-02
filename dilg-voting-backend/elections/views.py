@@ -18,6 +18,7 @@ from rest_framework.response import Response
 from .models import (
     Candidate,
     Election,
+    Notification,
     Nomination,
     Position,
     Voter,
@@ -38,6 +39,7 @@ from .serializers import (
     VoteSerializer,
     AdminVoterCreateSerializer,
     ElectionReminderSerializer,
+    NotificationSerializer,
 )
 
 User = get_user_model()
@@ -937,3 +939,48 @@ def admin_reset_election(request):
             "voters_reset": voters.count(),
         }
     )
+
+
+# =======================
+#  ADMIN NOTIFICATIONS
+# =======================
+
+
+@api_view(["GET", "POST"])
+def admin_notifications(request):
+    """
+    Simple admin notifications inbox.
+    - GET: ?history=1 to include hidden items; otherwise hides dismissed items.
+    - POST actions: mark_all_read, dismiss (ids list), delete (ids list)
+    """
+    admin = get_admin_from_request(request)
+    if not admin:
+        return Response({"error": "Admin authentication required"}, status=403)
+
+    if request.method == "GET":
+        show_history = request.query_params.get("history") in ["1", "true", "yes"]
+        qs = Notification.objects.all()
+        if not show_history:
+            qs = qs.filter(is_hidden=False)
+        qs = qs.order_by("-created_at", "-id")[:200]  # cap to avoid huge payloads
+        unread_count = Notification.objects.filter(is_read=False, is_hidden=False).count()
+        return Response(
+            {
+                "items": NotificationSerializer(qs, many=True).data,
+                "unread_count": unread_count,
+            }
+        )
+
+    action = (request.data.get("action") or "").strip()
+    ids = request.data.get("ids") or []
+    if action == "mark_all_read":
+        Notification.objects.filter(is_read=False).update(is_read=True)
+        return Response({"message": "Marked all as read"})
+    if action == "dismiss":
+        Notification.objects.filter(id__in=ids).update(is_hidden=True, is_read=True)
+        return Response({"message": "Dismissed"})
+    if action == "delete":
+        Notification.objects.filter(id__in=ids).delete()
+        return Response({"message": "Deleted"})
+
+    return Response({"error": "Invalid action"}, status=400)

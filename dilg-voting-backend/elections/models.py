@@ -269,6 +269,23 @@ class ElectionReminder(models.Model):
 
 
 # -------------------------
+#  ADMIN NOTIFICATIONS
+# -------------------------
+class Notification(models.Model):
+    type = models.CharField(max_length=80, default="info")
+    message = models.TextField()
+    is_read = models.BooleanField(default=False)
+    is_hidden = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at", "-id"]
+
+    def __str__(self):
+        return f"[{self.type}] {self.message[:50]}"
+
+
+# -------------------------
 #  DJANGO-USER ADMIN SESSIONS
 # -------------------------
 class AdminSession(models.Model):

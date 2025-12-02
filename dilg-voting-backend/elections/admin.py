@@ -9,6 +9,7 @@ from .models import (
     Position,
     Voter,
     Vote,
+    Notification,
     generate_pin,
 )
 
@@ -102,3 +103,11 @@ class ElectionReminderAdmin(admin.ModelAdmin):
     list_display = ("election", "remind_at", "note")
     list_filter = ("election",)
     search_fields = ("note",)
+
+
+@admin.register(Notification)
+class NotificationAdmin(admin.ModelAdmin):
+    list_display = ("type", "message", "is_read", "is_hidden", "created_at")
+    list_filter = ("type", "is_read", "is_hidden")
+    search_fields = ("message",)
+    ordering = ("-created_at",)

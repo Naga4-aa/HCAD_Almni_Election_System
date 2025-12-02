@@ -230,14 +230,14 @@ onUnmounted(() => {
 
 <template>
   <div class="space-y-4">
-    <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm flex flex-col gap-2">
-      <div class="flex items-center justify-between gap-2">
-        <div>
+    <div class="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 shadow-sm flex flex-col gap-3">
+      <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+        <div class="space-y-1">
           <p class="text-xs uppercase tracking-wide text-emerald-600 font-semibold">Nomination</p>
-          <h2 class="text-lg font-semibold">Submit your nominee</h2>
+          <h2 class="text-lg font-semibold leading-tight">Submit your nominee</h2>
           <p class="text-xs text-slate-500">One nomination per voter for this election.</p>
         </div>
-        <div class="text-right text-xs text-slate-600 space-y-0.5">
+        <div class="text-xs text-slate-600 space-y-0.5 sm:text-right">
           <p class="font-semibold">Phase: {{ hasTimeline ? displayPhase : 'N/A' }}</p>
           <p v-if="resetNotice" class="text-amber-700">{{ resetNotice }}</p>
           <p v-else-if="nominationTiming?.countdown" :class="nominationTiming?.tone === 'success' ? 'text-emerald-700' : 'text-amber-700'">
@@ -288,7 +288,7 @@ onUnmounted(() => {
             />
           </div>
 
-          <div class="grid grid-cols-2 gap-3">
+          <div class="grid gap-3 sm:grid-cols-2">
             <div>
               <label class="text-xs font-semibold text-slate-700">Batch / Year</label>
               <input
@@ -311,7 +311,7 @@ onUnmounted(() => {
             </div>
           </div>
 
-          <div class="grid grid-cols-2 gap-3">
+          <div class="grid gap-3 sm:grid-cols-2">
             <div>
               <label class="text-xs font-semibold text-slate-700">Contact Email (optional)</label>
               <input
@@ -365,7 +365,7 @@ onUnmounted(() => {
             </label>
           </div>
 
-          <div class="flex gap-2">
+          <div class="flex flex-wrap gap-2">
             <button
               @click="submitNomination"
               :disabled="submitting || !isNominationOpen"

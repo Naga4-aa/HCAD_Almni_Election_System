@@ -87,9 +87,9 @@ onUnmounted(() => {
 
 <template>
   <div class="space-y-4">
-    <div class="bg-white/90 rounded-2xl border border-slate-200 p-5 shadow-sm">
-      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-        <div>
+    <div class="bg-white/90 rounded-2xl border border-slate-200 p-4 sm:p-5 shadow-sm">
+      <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <div class="space-y-1">
           <p class="text-xs uppercase tracking-wide text-emerald-600 font-semibold">Results</p>
           <h2 class="text-lg font-semibold">{{ results?.demo ? 'Demo results' : 'Official results' }}</h2>
           <p class="text-xs text-slate-500">
@@ -104,7 +104,7 @@ onUnmounted(() => {
           <p v-if="results?.demo" class="text-[11px] text-amber-700 mt-1">Demo mode: not official.</p>
         </div>
         <button
-          class="px-3 py-1.5 rounded-lg text-xs border border-slate-200 hover:bg-emerald-50"
+          class="px-3 py-1.5 rounded-lg text-xs border border-slate-200 hover:bg-emerald-50 self-start sm:self-auto"
           @click="loadResults"
         >
           Refresh
@@ -119,9 +119,9 @@ onUnmounted(() => {
       <div
         v-for="pos in results.positions || []"
         :key="pos.position_id"
-        class="bg-white/90 rounded-2xl border border-slate-200 p-4 shadow-sm"
+        class="bg-white/90 rounded-2xl border border-slate-200 p-4 sm:p-5 shadow-sm space-y-3"
       >
-        <div class="flex items-center justify-between mb-2">
+        <div class="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
           <h3 class="text-sm font-semibold text-slate-800">{{ pos.position }}</h3>
           <span class="text-[11px] text-slate-500">{{ pos.candidates?.length || 0 }} candidate(s)</span>
         </div>

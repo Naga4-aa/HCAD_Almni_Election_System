@@ -509,33 +509,33 @@ onMounted(async () => {
 
 <template>
   <div class="space-y-4">
-    <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm flex items-center justify-between">
-      <div>
+    <div class="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 shadow-sm flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div class="space-y-1">
         <p class="text-xs uppercase tracking-wide text-emerald-600 font-semibold">Admin</p>
-        <h2 class="text-lg font-semibold">COMELEC Dashboard</h2>
+        <h2 class="text-lg font-semibold leading-tight">COMELEC Dashboard</h2>
         <p class="text-xs text-slate-500">Live turnout, tallies, and nominations.</p>
       </div>
-      <div class="flex gap-2 items-center">
-        <button @click="resetElection" :disabled="resettingElection" class="text-xs px-3 py-1.5 rounded-lg border border-rose-400 text-rose-700 bg-rose-50 hover:bg-rose-100 disabled:opacity-60">{{ resettingElection ? 'Resetting.' : 'Reset election' }}</button>
-        <button @click="logout" class="text-xs px-3 py-1.5 rounded-lg border border-slate-300 hover:bg-slate-100">Logout</button>
+      <div class="flex flex-wrap gap-2 items-center justify-start sm:justify-end w-full sm:w-auto">
+        <button @click="resetElection" :disabled="resettingElection" class="text-sm px-3 py-2 rounded-lg border border-rose-400 text-rose-700 bg-rose-50 hover:bg-rose-100 disabled:opacity-60">{{ resettingElection ? 'Resetting.' : 'Reset election' }}</button>
+        <button @click="logout" class="text-sm px-3 py-2 rounded-lg border border-slate-300 hover:bg-slate-100">Logout</button>
       </div>
     </div>
 
-    <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm flex flex-col gap-2">
-      <div class="flex items-center justify-between">
-        <div class="flex items-center gap-2">
+    <div class="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 shadow-sm flex flex-col gap-3">
+      <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <div class="flex flex-wrap items-center gap-2">
           <span class="text-sm font-semibold">Notifications</span>
           <span class="text-[11px] px-2 py-1 rounded-full" :class="unreadNotifications ? 'bg-rose-100 text-rose-700' : 'bg-emerald-50 text-emerald-700'">
             {{ unreadNotifications }} unread
           </span>
-          <button @click="notificationsCollapsed = !notificationsCollapsed" class="text-xs px-2 py-1 rounded border border-slate-300 hover:bg-slate-100">
+          <button @click="notificationsCollapsed = !notificationsCollapsed" class="text-xs px-3 py-1.5 rounded-lg border border-slate-300 hover:bg-slate-100">
             {{ notificationsCollapsed ? 'Expand' : 'Collapse' }}
           </button>
-          <button @click="showHistory = !showHistory; loadNotifications()" class="text-xs px-2 py-1 rounded border border-slate-300 hover:bg-slate-100">
+          <button @click="showHistory = !showHistory; loadNotifications()" class="text-xs px-3 py-1.5 rounded-lg border border-slate-300 hover:bg-slate-100">
             {{ showHistory ? 'Hide history' : 'Show history' }}
           </button>
         </div>
-        <div class="flex gap-2">
+        <div class="flex flex-wrap gap-2 justify-start lg:justify-end">
           <button @click="loadNotifications" class="text-xs px-3 py-1.5 rounded-lg border border-slate-300 hover:bg-slate-100" :disabled="notificationsLoading">Refresh</button>
           <button @click="markAllNotificationsRead" class="text-xs px-3 py-1.5 rounded-lg border border-emerald-400 text-emerald-700 bg-emerald-50" :disabled="notificationsLoading || unreadNotifications === 0">Mark all read</button>
         </div>
@@ -546,8 +546,8 @@ onMounted(async () => {
       <div v-else-if="!notifications.length" class="text-[11px] text-slate-500">No notifications yet.</div>
       <ul
         v-else
-        class="divide-y divide-slate-200 text-[11px] text-slate-700"
-        style="max-height: 220px; overflow-y: auto;"
+        class="divide-y divide-slate-200 text-[11px] text-slate-700 pr-1"
+        style="max-height: 260px; overflow-y: auto;"
       >
         <li v-for="n in notifications" :key="n.id" class="py-2 flex items-start gap-2">
           <span class="mt-0.5 h-2 w-2 rounded-full" :class="n.is_read ? 'bg-slate-300' : 'bg-emerald-500'"></span>
@@ -568,38 +568,38 @@ onMounted(async () => {
     <div v-if="loading" class="text-sm text-slate-500">Loading dashboard.</div>
     <p v-if="errorMessage" class="text-sm text-rose-600">{{ errorMessage }}</p>
 
-    <div class="sticky top-16 z-10 bg-slate-50/90 backdrop-blur rounded-2xl border border-slate-200 px-3 py-2 flex flex-wrap gap-2">
+    <div class="sticky top-16 z-10 bg-slate-50/90 backdrop-blur rounded-2xl border border-slate-200 px-2 sm:px-3 py-2 flex gap-2 overflow-x-auto">
       <button
         v-for="s in sections"
         :key="s.key"
         @click="activeSection = s.key"
-        class="text-xs px-3 py-1.5 rounded-full border"
+        class="text-xs px-3 py-1.5 rounded-full border whitespace-nowrap"
         :class="activeSection === s.key ? 'bg-emerald-600 text-white border-emerald-600' : 'border-slate-300 hover:bg-slate-100'"
       >
         {{ s.label }}
       </button>
     </div>
 
-    <div v-if="activeSection === 'stats' && stats" id="stats" class="grid gap-3 md:grid-cols-3">
-      <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
+    <div v-if="activeSection === 'stats' && stats" id="stats" class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      <div class="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 shadow-sm">
         <p class="text-xs text-slate-500">Total voters</p>
         <p class="text-2xl font-semibold">{{ stats.total_voters }}</p>
       </div>
-      <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
+      <div class="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 shadow-sm">
         <p class="text-xs text-slate-500">Voted</p>
         <p class="text-2xl font-semibold">{{ stats.voted_count }}</p>
       </div>
-      <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
+      <div class="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 shadow-sm">
         <p class="text-xs text-slate-500">Turnout</p>
         <p class="text-2xl font-semibold">{{ stats.turnout_percent }}%</p>
       </div>
     </div>
 
-    <div v-if="activeSection === 'tally'" id="tally" class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
+    <div v-if="activeSection === 'tally'" id="tally" class="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 shadow-sm">
       <h3 class="text-sm font-semibold mb-3">Per-position tally</h3>
       <div class="grid gap-4 md:grid-cols-2">
         <div v-for="pos in tally" :key="pos.position_id" class="border border-slate-100 rounded-xl p-3 space-y-3">
-          <div class="flex items-center justify-between">
+          <div class="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
             <p class="text-sm font-semibold">{{ pos.position }}</p>
             <span class="text-[11px] text-slate-500">{{ pos.candidates.length }} candidate(s)</span>
           </div>
@@ -623,7 +623,7 @@ onMounted(async () => {
       </div>
 
       <div class="mt-6 border-t border-slate-200 pt-4">
-        <div class="flex items-center justify-between mb-3">
+        <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between mb-3">
           <h4 class="text-sm font-semibold">Published results view</h4>
           <button
             class="text-xs px-3 py-1.5 rounded-lg border border-slate-200 hover:bg-emerald-50"
@@ -661,15 +661,15 @@ onMounted(async () => {
       </div>
     </div>
 
-    <div v-if="activeSection === 'timeline'" id="timeline" class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-3">
-      <div class="flex items-center justify-between">
-        <h3 class="text-sm font-semibold">Election timeline</h3>
+    <div v-if="activeSection === 'timeline'" id="timeline" class="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 shadow-sm space-y-3">
+      <div class="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+        <h3 class="text-sm font-semibold leading-tight">Election timeline</h3>
         <span class="text-[11px] text-slate-500">Nomination & voting windows</span>
       </div>
       <p v-if="electionError" class="text-xs text-rose-600">{{ electionError }}</p>
       <p v-else-if="electionMessage" class="text-xs text-emerald-600">{{ electionMessage }}</p>
       <p v-else-if="!election" class="text-xs text-slate-500">No election configured. Set the dates below and save to create one.</p>
-      <div class="flex flex-wrap items-center gap-2 text-xs">
+      <div class="flex flex-wrap items-center gap-2 text-xs sm:text-sm">
         <span class="font-semibold text-slate-700">Mode:</span>
         <button
           @click="switchMode('timeline')"
@@ -735,7 +735,7 @@ onMounted(async () => {
       <div v-else class="rounded-lg border border-dashed border-slate-300 p-3 bg-slate-50 text-[12px] text-slate-700">
         Timeline dates are hidden in demo mode. Use the demo buttons below to move phases and show/hide demo results. Switch back to timeline mode to edit dates.
       </div>
-      <div class="flex flex-wrap gap-2 items-center">
+      <div class="flex flex-col sm:flex-row sm:items-center gap-3">
         <button
           @click="saveElection"
           :disabled="savingElection || timelineMode === 'demo'"
@@ -743,7 +743,7 @@ onMounted(async () => {
         >
           {{ savingElection ? 'Saving.' : 'Save timeline' }}
         </button>
-        <div class="flex items-center gap-2 text-xs text-slate-600">
+        <div class="flex flex-wrap items-center gap-2 text-xs text-slate-600">
           <span v-if="election">Status: {{ election.results_published ? 'Results published' : 'Not published' }}</span>
           <span v-else>No election saved yet.</span>
           <button
@@ -758,7 +758,7 @@ onMounted(async () => {
         </div>
       </div>
       <div v-if="timelineMode === 'demo'" class="mt-4 border-t border-slate-200 pt-3 space-y-2">
-        <div class="flex items-center justify-between">
+        <div class="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
           <h4 class="text-sm font-semibold">Demo controls</h4>
           <span class="text-[11px] text-slate-500">
             Toggle phases without dates (mode: {{ election?.demo_phase || 'unset' }})
@@ -805,8 +805,8 @@ onMounted(async () => {
       </div>
     </div>
 
-    <div v-if="activeSection === 'nominations'" id="nominations" class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-3">
-      <div class="flex items-center justify-between">
+    <div v-if="activeSection === 'nominations'" id="nominations" class="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 shadow-sm space-y-3">
+      <div class="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
         <h3 class="text-sm font-semibold">Nominations</h3>
         <p class="text-[11px] text-slate-500">Promote to make official candidates.</p>
       </div>
@@ -839,7 +839,7 @@ onMounted(async () => {
       </div>
     </div>
 
-    <div v-if="activeSection === 'reminders'" id="reminders" class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-2">
+    <div v-if="activeSection === 'reminders'" id="reminders" class="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 shadow-sm space-y-2">
       <h3 class="text-sm font-semibold">Reminders</h3>
       <div v-if="!reminders.length" class="text-xs text-slate-500">No reminders stored.</div>
       <ul v-else class="text-sm text-slate-700 list-disc list-inside">
@@ -847,10 +847,10 @@ onMounted(async () => {
       </ul>
     </div>
 
-    <div v-if="activeSection === 'voters'" id="voters" class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-3">
-      <div class="flex items-center justify-between">
+    <div v-if="activeSection === 'voters'" id="voters" class="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 shadow-sm space-y-3">
+      <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <h3 class="text-sm font-semibold">Voters</h3>
-        <div class="flex gap-2">
+        <div class="flex flex-wrap gap-2">
           <button @click="exportRecentVotersCsv" class="text-xs px-3 py-1.5 rounded-lg border border-slate-300 hover:bg-slate-100">Export recent CSV</button>
           <button @click="openAddVoter" class="text-xs px-3 py-1.5 rounded-lg bg-emerald-600 text-white shadow-sm">Add voter</button>
           <button
@@ -882,28 +882,30 @@ onMounted(async () => {
         </div>
       </div>
       <div class="max-h-64 overflow-y-auto border border-slate-100 rounded-xl" v-if="voters.length">
-        <table class="w-full text-xs">
-          <thead class="bg-slate-50">
-            <tr class="text-left text-slate-500">
-              <th class="px-3 py-2">Name</th>
-              <th class="px-3 py-2">Voter ID</th>
-              <th class="px-3 py-2">Batch</th>
-              <th class="px-3 py-2">Voted</th>
-              <th class="px-3 py-2 text-right">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="v in voters" :key="v.id" class="border-t border-slate-100">
-              <td class="px-3 py-2">{{ v.name }}</td>
-              <td class="px-3 py-2">{{ v.voter_id }}</td>
-              <td class="px-3 py-2">{{ v.batch_year || 'N/A' }}</td>
-              <td class="px-3 py-2">{{ v.has_voted ? 'Yes' : 'No' }}</td>
-              <td class="px-3 py-2 text-right">
-                <button @click="resetVoterPin(v)" class="text-[10px] px-2 py-1 rounded border border-slate-300 hover:bg-slate-100">Reset PIN</button>
-              </td>
-            </tr>
-          </tbody>
-        </table>
+        <div class="overflow-x-auto">
+          <table class="w-full min-w-[600px] text-xs">
+            <thead class="bg-slate-50">
+              <tr class="text-left text-slate-500">
+                <th class="px-3 py-2">Name</th>
+                <th class="px-3 py-2">Voter ID</th>
+                <th class="px-3 py-2">Batch</th>
+                <th class="px-3 py-2">Voted</th>
+                <th class="px-3 py-2 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="v in voters" :key="v.id" class="border-t border-slate-100">
+                <td class="px-3 py-2">{{ v.name }}</td>
+                <td class="px-3 py-2">{{ v.voter_id }}</td>
+                <td class="px-3 py-2">{{ v.batch_year || 'N/A' }}</td>
+                <td class="px-3 py-2">{{ v.has_voted ? 'Yes' : 'No' }}</td>
+                <td class="px-3 py-2 text-right">
+                  <button @click="resetVoterPin(v)" class="text-[10px] px-2 py-1 rounded border border-slate-300 hover:bg-slate-100">Reset PIN</button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </div>
       <p v-if="voterError" class="text-xs text-rose-600">{{ voterError }}</p>
     </div>

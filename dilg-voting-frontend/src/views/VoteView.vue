@@ -247,14 +247,14 @@ onUnmounted(() => {
 
 <template>
   <div class="space-y-4">
-    <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
-      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-        <div>
+    <div class="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 shadow-sm">
+      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3">
+        <div class="space-y-1">
           <p class="text-xs uppercase tracking-wide text-emerald-600 font-semibold">Voting</p>
-          <h2 class="text-lg font-semibold">Cast your ballot</h2>
+          <h2 class="text-lg font-semibold leading-tight">Cast your ballot</h2>
           <p class="text-xs text-slate-500">One vote per position. Submit once.</p>
         </div>
-        <div class="text-right text-xs text-slate-600 space-y-0.5">
+        <div class="text-xs text-slate-600 space-y-0.5 sm:text-right">
           <p class="font-semibold">Phase: {{ hasTimeline ? phase : 'N/A' }}</p>
           <p v-if="resetNotice" class="text-amber-700">{{ resetNotice }}</p>
           <p v-else-if="votingTiming?.countdown" :class="votingTiming.tone === 'success' ? 'text-emerald-700' : 'text-amber-700'">
@@ -283,10 +283,10 @@ onUnmounted(() => {
       <div
         v-for="pos in positions"
         :key="pos.id"
-        class="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm"
+        class="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 shadow-sm space-y-3"
       >
-        <div class="flex items-center justify-between mb-3">
-          <div>
+        <div class="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+          <div class="space-y-0.5">
             <h3 class="text-sm font-semibold">{{ pos.name_display || pos.name }}</h3>
             <p class="text-[11px] text-slate-500">Select one candidate</p>
           </div>
@@ -322,12 +322,12 @@ onUnmounted(() => {
         </div>
       </div>
 
-      <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm space-y-3">
+      <div class="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 shadow-sm space-y-3">
         <div class="flex items-start gap-2 text-sm text-slate-700">
           <input type="checkbox" v-model="consent" :disabled="hasVoted" />
           <span>I agree to the processing of my personal data for the purpose of elections.</span>
         </div>
-        <div class="flex gap-2">
+        <div class="flex flex-wrap gap-2">
           <button
             @click="submitBallot"
             :disabled="submitting || hasVoted || !votingOpen"

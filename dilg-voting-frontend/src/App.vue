@@ -1,6 +1,6 @@
 ﻿<script setup>
 import { RouterLink, RouterView, useRoute } from 'vue-router'
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useAuthStore } from './stores/auth'
 import { useAdminAuthStore } from './stores/adminAuth'
 import Logo from './assets/HCAD_Alumni_Org_Logo.jpg'
@@ -8,6 +8,7 @@ import Logo from './assets/HCAD_Alumni_Org_Logo.jpg'
 const authStore = useAuthStore()
 const adminAuth = useAdminAuthStore()
 const route = useRoute()
+const mobileMenuOpen = ref(false)
 
 authStore.initFromStorage()
 adminAuth.initFromStorage()
@@ -16,12 +17,23 @@ const isAdminContext = computed(() => {
   const name = route.name ? route.name.toString() : ''
   return name.startsWith('admin')
 })
+
+const voterLinks = computed(() => {
+  const links = [
+    { to: '/', label: 'Home', show: !authStore.isAuthenticated },
+    { to: '/info', label: 'Registration', show: !authStore.isAuthenticated },
+    { to: '/nomination', label: 'Nomination', show: authStore.isAuthenticated },
+    { to: '/vote', label: 'Ballot', show: authStore.isAuthenticated },
+    { to: '/results', label: 'Results', show: authStore.isAuthenticated },
+  ]
+  return links.filter((l) => l.show)
+})
 </script>
 
 <template>
   <div class="min-h-screen text-slate-800 app-shell">
     <header class="header-bar sticky top-0 z-20">
-      <div class="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between gap-3">
+      <div class="relative max-w-6xl mx-auto px-4 py-3 flex items-center justify-between gap-3">
         <div class="flex items-center gap-3">
           <img
             :src="Logo"
@@ -58,11 +70,15 @@ const isAdminContext = computed(() => {
         <!-- Voter/landing header -->
         <template v-else>
           <nav class="hidden sm:flex items-center gap-2 text-xs font-medium">
-            <RouterLink v-if="!authStore.isAuthenticated" to="/" class="px-3 py-1.5 rounded-lg hover:bg-slate-100" active-class="bg-emerald-50 text-emerald-700">Home</RouterLink>
-            <RouterLink v-if="!authStore.isAuthenticated" to="/info" class="px-3 py-1.5 rounded-lg hover:bg-slate-100" active-class="bg-emerald-50 text-emerald-700">Registration</RouterLink>
-            <RouterLink v-if="authStore.isAuthenticated" to="/nomination" class="px-3 py-1.5 rounded-lg hover:bg-slate-100" active-class="bg-emerald-50 text-emerald-700">Nomination</RouterLink>
-            <RouterLink v-if="authStore.isAuthenticated" to="/vote" class="px-3 py-1.5 rounded-lg hover:bg-slate-100" active-class="bg-emerald-50 text-emerald-700">Ballot</RouterLink>
-            <RouterLink v-if="authStore.isAuthenticated" to="/results" class="px-3 py-1.5 rounded-lg hover:bg-slate-100" active-class="bg-emerald-50 text-emerald-700">Results</RouterLink>
+            <RouterLink
+              v-for="link in voterLinks"
+              :key="link.to"
+              :to="link.to"
+              class="px-3 py-1.5 rounded-lg hover:bg-slate-100"
+              active-class="bg-emerald-50 text-emerald-700"
+            >
+              {{ link.label }}
+            </RouterLink>
           </nav>
 
           <div class="flex items-center gap-2 text-[11px] text-slate-600">
@@ -81,6 +97,55 @@ const isAdminContext = computed(() => {
               v-else
               @click="authStore.logout(); $router.push('/login')"
               class="px-3 py-1.5 rounded-lg border border-slate-300 text-xs hover:bg-slate-100"
+            >
+              Logout
+            </button>
+          </div>
+
+          <!-- Mobile burger -->
+          <button
+            class="sm:hidden inline-flex items-center justify-center h-10 w-10 rounded-lg border border-slate-200 bg-white/80 shadow-sm"
+            @click="mobileMenuOpen = !mobileMenuOpen"
+            aria-label="Toggle navigation"
+          >
+            <svg v-if="!mobileMenuOpen" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-slate-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+            </svg>
+            <svg v-else xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-slate-700" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+
+          <div
+            v-if="mobileMenuOpen"
+            class="sm:hidden absolute top-full right-4 mt-2 w-56 rounded-2xl border border-slate-200 bg-white shadow-xl p-3 space-y-2"
+          >
+            <div v-if="authStore.isAuthenticated" class="text-xs text-slate-700 border-b border-slate-100 pb-2 mb-2">
+              <p class="font-semibold">{{ authStore.voter?.name }}</p>
+              <p>Voter ID: {{ authStore.voter?.voter_id }}</p>
+            </div>
+            <RouterLink
+              v-for="link in voterLinks"
+              :key="link.to"
+              :to="link.to"
+              class="block px-3 py-2 rounded-lg text-xs hover:bg-slate-100"
+              active-class="bg-emerald-50 text-emerald-700"
+              @click="mobileMenuOpen = false"
+            >
+              {{ link.label }}
+            </RouterLink>
+            <RouterLink
+              v-if="!authStore.isAuthenticated"
+              to="/login"
+              class="block px-3 py-2 rounded-lg bg-emerald-600 text-white text-xs shadow-sm hover:bg-emerald-700"
+              @click="mobileMenuOpen = false"
+            >
+              Voter Login
+            </RouterLink>
+            <button
+              v-else
+              @click="authStore.logout(); $router.push('/login'); mobileMenuOpen = false"
+              class="w-full px-3 py-2 rounded-lg border border-slate-300 text-xs text-left hover:bg-slate-100"
             >
               Logout
             </button>
