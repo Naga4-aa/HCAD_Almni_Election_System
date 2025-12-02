@@ -41,6 +41,12 @@ const notificationsLoading = ref(false)
 const notificationsError = ref('')
 const notificationsCollapsed = ref(false)
 const showHistory = ref(false)
+const recentVoters = ref([])
+
+const pruneRecentVoters = () => {
+  const cutoff = Date.now() - 30 * 60 * 1000 // 30 minutes
+  recentVoters.value = recentVoters.value.filter((v) => v.createdAt >= cutoff)
+}
 
 // Voters
 const voters = ref([])
@@ -158,6 +164,52 @@ const deleteNotification = async (id) => {
   } catch (err) {
     notificationsError.value = err.response?.data?.error || 'Failed to delete notification.'
   }
+}
+
+const resetVoterPin = async (voter) => {
+  if (!window.confirm(`Reset PIN for ${voter.name}? This will end any active session.`)) return
+  try {
+    const res = await api.post(`admin/voters/${voter.id}/reset-pin/`)
+    alert(`PIN reset.\nVoter ID: ${res.data.voter_id}\nPIN: ${res.data.pin}`)
+    pruneRecentVoters()
+    recentVoters.value.unshift({
+      id: voter.id,
+      name: voter.name,
+      voter_id: res.data.voter_id,
+      pin: res.data.pin,
+      createdAt: Date.now(),
+      source: 'Reset',
+    })
+    await loadVoters()
+  } catch (err) {
+    alert(err.response?.data?.error || 'Failed to reset PIN.')
+  }
+}
+
+const exportRecentVotersCsv = () => {
+  pruneRecentVoters()
+  if (!recentVoters.value.length) {
+    alert('No recent credentials to export (last 30 minutes).')
+    return
+  }
+  const header = ['Name', 'Voter ID', 'PIN', 'Source', 'Generated At']
+  const rows = recentVoters.value.map((v) => [
+    v.name,
+    v.voter_id,
+    v.pin,
+    v.source || 'New',
+    new Date(v.createdAt).toLocaleString(),
+  ])
+  const csv = [header, ...rows]
+    .map((r) => r.map((f) => `"${String(f).replace(/"/g, '""')}"`).join(','))
+    .join('\n')
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = `voters_credentials_${Date.now()}.csv`
+  link.click()
+  URL.revokeObjectURL(url)
 }
 
 const loadElection = async () => {
@@ -380,6 +432,15 @@ const submitVoter = async () => {
     await loadVoters()
     addVoterModal.value = false
     alert(`Voter created.\nVoter ID: ${res.data.voter_id}\nPIN: ${res.data.pin || newVoter.value.pin || 'N/A'}`)
+    pruneRecentVoters()
+    recentVoters.value.unshift({
+      id: res.data.id || Date.now(),
+      name: newVoter.value.name,
+      voter_id: res.data.voter_id,
+      pin: res.data.pin || newVoter.value.pin || 'N/A',
+      createdAt: Date.now(),
+      source: 'New',
+    })
   } catch (err) {
     voterError.value = err.response?.data?.error || 'Failed to create voter.'
   } finally {
@@ -411,6 +472,7 @@ onMounted(async () => {
   }
   loading.value = true
   try {
+    pruneRecentVoters()
     await Promise.all([
       loadStats(),
       loadTally(),
@@ -737,6 +799,7 @@ onMounted(async () => {
       <div class="flex items-center justify-between">
         <h3 class="text-sm font-semibold">Voters</h3>
         <div class="flex gap-2">
+          <button @click="exportRecentVotersCsv" class="text-xs px-3 py-1.5 rounded-lg border border-slate-300 hover:bg-slate-100">Export recent CSV</button>
           <button @click="openAddVoter" class="text-xs px-3 py-1.5 rounded-lg bg-emerald-600 text-white shadow-sm">Add voter</button>
           <button
             @click="resetAllVoters"
@@ -753,6 +816,19 @@ onMounted(async () => {
       </label>
       <div v-if="loadingVoters" class="text-xs text-slate-500">Loading voters.</div>
       <div v-else class="text-xs text-slate-600">Total: {{ voters.length }}</div>
+      <div v-if="recentVoters.length" class="border border-slate-100 rounded-xl p-3 bg-slate-50 text-[11px] space-y-2">
+        <div class="flex items-center justify-between">
+          <p class="font-semibold text-slate-800">Recent credentials (last 30 min)</p>
+          <button @click="pruneRecentVoters" class="px-2 py-1 rounded border border-slate-300 hover:bg-slate-100 text-[10px]">Refresh</button>
+        </div>
+        <div class="max-h-40 overflow-y-auto divide-y divide-slate-200">
+          <div v-for="rv in recentVoters" :key="rv.voter_id + rv.pin" class="py-2">
+            <p class="font-semibold text-slate-800">{{ rv.name }} <span class="text-slate-500">({{ rv.voter_id }})</span></p>
+            <p class="text-slate-700">PIN: {{ rv.pin }}</p>
+            <p class="text-slate-500 text-[10px]">{{ rv.source }} · {{ new Date(rv.createdAt).toLocaleString() }}</p>
+          </div>
+        </div>
+      </div>
       <div class="max-h-64 overflow-y-auto border border-slate-100 rounded-xl" v-if="voters.length">
         <table class="w-full text-xs">
           <thead class="bg-slate-50">
@@ -761,6 +837,7 @@ onMounted(async () => {
               <th class="px-3 py-2">Voter ID</th>
               <th class="px-3 py-2">Batch</th>
               <th class="px-3 py-2">Voted</th>
+              <th class="px-3 py-2 text-right">Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -769,6 +846,9 @@ onMounted(async () => {
               <td class="px-3 py-2">{{ v.voter_id }}</td>
               <td class="px-3 py-2">{{ v.batch_year || 'N/A' }}</td>
               <td class="px-3 py-2">{{ v.has_voted ? 'Yes' : 'No' }}</td>
+              <td class="px-3 py-2 text-right">
+                <button @click="resetVoterPin(v)" class="text-[10px] px-2 py-1 rounded border border-slate-300 hover:bg-slate-100">Reset PIN</button>
+              </td>
             </tr>
           </tbody>
         </table>
