@@ -52,12 +52,14 @@ class Election(models.Model):
 
     # Phase helpers
     def is_nomination_open(self):
+        # Bail out if dates are missing to avoid comparing with None
         if not self.nomination_start or not self.nomination_end:
             return False
         now = timezone.now()
         return self.nomination_start <= now <= self.nomination_end
 
     def is_voting_open(self):
+        # Bail out if dates are missing to avoid comparing with None
         if not self.voting_start or not self.voting_end:
             return False
         now = timezone.now()
@@ -65,25 +67,20 @@ class Election(models.Model):
 
     @property
     def phase(self):
-        if not all(
-            [
-                self.nomination_start,
-                self.nomination_end,
-                self.voting_start,
-                self.voting_end,
-            ]
-        ):
-            return "unconfigured"
         now = timezone.now()
-        if self.nomination_start and now < self.nomination_start:
+        if not self.nomination_start or not self.nomination_end:
+            return "unconfigured"
+        if now < self.nomination_start:
             return "upcoming"
         if self.is_nomination_open():
             return "nomination"
-        if self.nomination_end and now < self.voting_start:
+        if not self.voting_start or not self.voting_end:
+            return "unconfigured"
+        if now < self.voting_start:
             return "between"
         if self.is_voting_open():
             return "voting"
-        if self.voting_end and now < (self.results_at or self.voting_end):
+        if now < (self.results_at or self.voting_end):
             return "closed_pending_results"
         return "closed"
 
