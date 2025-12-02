@@ -1,6 +1,6 @@
 ﻿<!-- src/views/AdminDashboard.vue -->
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, watch } from 'vue'
 import api from '../api'
 import { useAdminAuthStore } from '../stores/adminAuth'
 import { useRouter } from 'vue-router'
@@ -68,7 +68,7 @@ const resetPins = ref(false)
 const resettingElection = ref(false)
 
 // UI state: show one section at a time
-const activeSection = ref('stats')
+const activeSection = ref(localStorage.getItem('adminActiveSection') || 'stats')
 const sections = [
   { key: 'stats', label: 'Stats' },
   { key: 'tally', label: 'Tally' },
@@ -77,6 +77,12 @@ const sections = [
   { key: 'reminders', label: 'Reminders' },
   { key: 'voters', label: 'Voters' },
 ]
+
+watch(
+  () => activeSection.value,
+  (val) => localStorage.setItem('adminActiveSection', val),
+  { immediate: true },
+)
 
 const toInput = (val) => {
   if (!val) return ''
@@ -210,6 +216,16 @@ const exportRecentVotersCsv = () => {
   link.download = `voters_credentials_${Date.now()}.csv`
   link.click()
   URL.revokeObjectURL(url)
+}
+
+const clearTimelineDates = () => {
+  electionForm.value.nomination_start = ''
+  electionForm.value.nomination_end = ''
+  electionForm.value.voting_start = ''
+  electionForm.value.voting_end = ''
+  electionForm.value.results_at = ''
+  electionForm.value.is_active = false
+  saveElection()
 }
 
 const loadElection = async () => {
@@ -657,15 +673,15 @@ onMounted(async () => {
         <span class="font-semibold text-slate-700">Mode:</span>
         <button
           @click="switchMode('timeline')"
-          :class="timelineMode === 'timeline' ? 'bg-emerald-600 text-white border border-emerald-600' : 'border border-slate-300 text-slate-700 hover:bg-slate-100'"
-          class="px-3 py-1.5 rounded-full"
+          :class="timelineMode === 'timeline' ? 'bg-emerald-600 text-white border border-emerald-600 shadow-sm' : 'border border-slate-300 text-slate-700 hover:bg-slate-100'"
+          class="px-3 py-1.5 rounded-full transition"
         >
           Timeline (use dates)
         </button>
         <button
           @click="switchMode('demo')"
-          :class="timelineMode === 'demo' ? 'bg-slate-900 text-white border border-slate-900' : 'border border-slate-300 text-slate-700 hover:bg-slate-100'"
-          class="px-3 py-1.5 rounded-full"
+          :class="timelineMode === 'demo' ? 'bg-slate-900 text-white border border-slate-900 shadow-sm' : 'border border-slate-300 text-slate-700 hover:bg-slate-100'"
+          class="px-3 py-1.5 rounded-full transition"
         >
           Demo (manual phases)
         </button>
@@ -673,39 +689,51 @@ onMounted(async () => {
           {{ timelineMode === 'demo' ? 'Demo mode ignores the schedule; use the buttons below to jump phases.' : 'Timeline mode uses the dates you set.' }}
         </span>
       </div>
-      <div class="grid gap-3 sm:grid-cols-2">
+      <div v-if="timelineMode === 'timeline'" class="grid gap-3 sm:grid-cols-2">
         <div class="sm:col-span-2">
           <label class="block text-xs font-semibold text-slate-700 mb-1">Election name</label>
-          <input v-model="electionForm.name" type="text" placeholder="e.g., 2025 HCAD Alumni Elections" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" :disabled="timelineMode === 'demo'" />
+          <input v-model="electionForm.name" type="text" placeholder="e.g., 2025 HCAD Alumni Elections" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" />
         </div>
         <div class="sm:col-span-2">
           <label class="block text-xs font-semibold text-slate-700 mb-1">Description (optional)</label>
-          <textarea v-model="electionForm.description" rows="2" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" :disabled="timelineMode === 'demo'"></textarea>
+          <textarea v-model="electionForm.description" rows="2" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"></textarea>
         </div>
         <div>
           <label class="block text-xs font-semibold text-slate-700 mb-1">Nomination start</label>
-          <input v-model="electionForm.nomination_start" type="datetime-local" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" :disabled="timelineMode === 'demo'" />
+          <input v-model="electionForm.nomination_start" type="datetime-local" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" />
         </div>
         <div>
           <label class="block text-xs font-semibold text-slate-700 mb-1">Nomination end</label>
-          <input v-model="electionForm.nomination_end" type="datetime-local" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" :disabled="timelineMode === 'demo'" />
+          <input v-model="electionForm.nomination_end" type="datetime-local" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" />
         </div>
         <div>
           <label class="block text-xs font-semibold text-slate-700 mb-1">Voting start</label>
-          <input v-model="electionForm.voting_start" type="datetime-local" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" :disabled="timelineMode === 'demo'" />
+          <input v-model="electionForm.voting_start" type="datetime-local" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" />
         </div>
         <div>
           <label class="block text-xs font-semibold text-slate-700 mb-1">Voting end</label>
-          <input v-model="electionForm.voting_end" type="datetime-local" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" :disabled="timelineMode === 'demo'" />
+          <input v-model="electionForm.voting_end" type="datetime-local" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" />
         </div>
         <div class="sm:col-span-2">
           <label class="block text-xs font-semibold text-slate-700 mb-1">Results announcement</label>
-          <input v-model="electionForm.results_at" type="datetime-local" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" :disabled="timelineMode === 'demo'" />
+          <input v-model="electionForm.results_at" type="datetime-local" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" />
         </div>
         <label class="flex items-center gap-2 text-xs text-slate-700">
-          <input v-model="electionForm.is_active" type="checkbox" :disabled="timelineMode === 'demo'" />
+          <input v-model="electionForm.is_active" type="checkbox" />
           Set election as active
         </label>
+        <div class="sm:col-span-2 flex flex-wrap gap-2">
+          <button
+            @click="clearTimelineDates"
+            type="button"
+            class="px-3 py-1.5 rounded-lg border border-slate-300 text-xs hover:bg-slate-100"
+          >
+            Clear dates
+          </button>
+        </div>
+      </div>
+      <div v-else class="rounded-lg border border-dashed border-slate-300 p-3 bg-slate-50 text-[12px] text-slate-700">
+        Timeline dates are hidden in demo mode. Use the demo buttons below to move phases and show/hide demo results. Switch back to timeline mode to edit dates.
       </div>
       <div class="flex flex-wrap gap-2 items-center">
         <button
@@ -737,10 +765,34 @@ onMounted(async () => {
           </span>
         </div>
         <div class="flex flex-wrap gap-2">
-          <button @click="triggerDemoPhase('open_nomination')" class="px-3 py-1.5 rounded-lg border text-xs">Open nomination</button>
-          <button @click="triggerDemoPhase('close_nomination')" class="px-3 py-1.5 rounded-lg border text-xs">Close nomination</button>
-          <button @click="triggerDemoPhase('open_voting')" class="px-3 py-1.5 rounded-lg border text-xs">Open voting</button>
-          <button @click="triggerDemoPhase('close_voting')" class="px-3 py-1.5 rounded-lg border text-xs">Close voting</button>
+          <button
+            @click="triggerDemoPhase('open_nomination')"
+            class="px-3 py-1.5 rounded-lg border text-xs"
+            :class="election?.demo_phase === 'nomination' ? 'border-emerald-500 text-emerald-700 bg-emerald-50' : ''"
+          >
+            Open nomination
+          </button>
+          <button
+            @click="triggerDemoPhase('close_nomination')"
+            class="px-3 py-1.5 rounded-lg border text-xs"
+            :class="election?.demo_phase === 'between' ? 'border-emerald-500 text-emerald-700 bg-emerald-50' : ''"
+          >
+            Close nomination
+          </button>
+          <button
+            @click="triggerDemoPhase('open_voting')"
+            class="px-3 py-1.5 rounded-lg border text-xs"
+            :class="election?.demo_phase === 'voting' ? 'border-emerald-500 text-emerald-700 bg-emerald-50' : ''"
+          >
+            Open voting
+          </button>
+          <button
+            @click="triggerDemoPhase('close_voting')"
+            class="px-3 py-1.5 rounded-lg border text-xs"
+            :class="election?.demo_phase === 'closed' ? 'border-emerald-500 text-emerald-700 bg-emerald-50' : ''"
+          >
+            Close voting
+          </button>
           <button @click="triggerDemoPhase('exit_demo')" class="px-3 py-1.5 rounded-lg border text-xs border-emerald-500 text-emerald-700">
             Return to timeline
           </button>

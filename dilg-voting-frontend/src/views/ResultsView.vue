@@ -13,7 +13,7 @@ const now = ref(Date.now())
 const hasActiveElection = computed(() => !!election.value && election.value.is_active)
 const hasTimeline = computed(() => {
   const e = election.value
-  if (!e || !e.is_active) return false
+  if (!e) return false
   const required = [e.nomination_start, e.nomination_end, e.voting_start, e.voting_end]
   return required.every((v) => {
     const ts = toMs(v)
@@ -68,9 +68,6 @@ const tick = async () => {
   refreshing = true
   try {
     await Promise.all([loadResults(), loadElection()])
-    if (!hasTimeline.value) {
-      results.value = null
-    }
   } catch (e) {
     // ignore transient refresh errors
   } finally {
@@ -80,9 +77,6 @@ const tick = async () => {
 
 onMounted(async () => {
   await Promise.all([loadResults(), loadElection()])
-  if (!hasTimeline.value) {
-    results.value = null
-  }
   timerId = setInterval(tick, 15000)
 })
 
@@ -97,7 +91,7 @@ onUnmounted(() => {
       <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
         <div>
           <p class="text-xs uppercase tracking-wide text-emerald-600 font-semibold">Results</p>
-          <h2 class="text-lg font-semibold">Official results</h2>
+          <h2 class="text-lg font-semibold">{{ results?.demo ? 'Demo results' : 'Official results' }}</h2>
           <p class="text-xs text-slate-500">
             <span v-if="results">Published {{ formatDateTime(results?.published_at) }}</span>
             <span v-else-if="loading">Checking publication status...</span>
@@ -107,6 +101,7 @@ onUnmounted(() => {
             Expected at {{ resultsEta }}
             <span v-if="resultsCountdown">(in {{ resultsCountdown.text }})</span>
           </p>
+          <p v-if="results?.demo" class="text-[11px] text-amber-700 mt-1">Demo mode: not official.</p>
         </div>
         <button
           class="px-3 py-1.5 rounded-lg text-xs border border-slate-200 hover:bg-emerald-50"
