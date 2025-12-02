@@ -29,10 +29,17 @@ const loading = ref(false)
 const submitting = ref(false)
 const lastElectionId = ref(null)
 
-const isNominationOpen = computed(() => election.value?.phase === 'nomination')
+const isDemoMode = computed(() => election.value?.mode === 'demo')
+const isNominationOpen = computed(() => {
+  if (isDemoMode.value && election.value?.demo_phase) {
+    return election.value.demo_phase === 'nomination'
+  }
+  return election.value?.phase === 'nomination'
+})
 const hasActiveElection = computed(() => !!election.value && election.value.is_active)
 const hasTimeline = computed(() => {
   const e = election.value
+  if (isDemoMode.value) return true
   if (!e || !e.is_active) return false
   const required = [e.nomination_start, e.nomination_end, e.voting_start, e.voting_end]
   return required.every((v) => {
@@ -43,6 +50,14 @@ const hasTimeline = computed(() => {
 const showNominationForm = computed(() => hasActiveElection.value && hasTimeline.value && isNominationOpen.value)
 
 const nominationTiming = computed(() => {
+  if (isDemoMode.value) {
+    return {
+      label: 'Demo mode',
+      countdown: null,
+      detail: `Phase: ${election.value?.demo_phase || 'unset'}`,
+      tone: 'info',
+    }
+  }
   if (!hasActiveElection.value || !hasTimeline.value) return null
   const start = toMs(election.value.nomination_start)
   const end = toMs(election.value.nomination_end)
@@ -76,9 +91,16 @@ const nominationTiming = computed(() => {
 
 const resetNotice = computed(() => {
   if (!election.value) return 'No active election. Waiting for admin to open nominations.'
+  if (isDemoMode.value) return 'Demo mode active. Phases are controlled manually by the admin.'
   if (!election.value.is_active) return 'Election timeline reset. Please check back once admin reactivates.'
   if (!hasTimeline.value) return 'Timeline not set. Waiting for admin to provide dates.'
   return ''
+})
+
+const displayPhase = computed(() => {
+  if (!election.value) return 'N/A'
+  if (isDemoMode.value) return election.value.demo_phase || 'demo'
+  return election.value.phase || 'N/A'
 })
 
 const loadElection = async () => {
@@ -216,7 +238,7 @@ onUnmounted(() => {
           <p class="text-xs text-slate-500">One nomination per voter for this election.</p>
         </div>
         <div class="text-right text-xs text-slate-600 space-y-0.5">
-          <p class="font-semibold">Phase: {{ hasTimeline ? election?.phase || 'N/A' : 'N/A' }}</p>
+          <p class="font-semibold">Phase: {{ hasTimeline ? displayPhase : 'N/A' }}</p>
           <p v-if="resetNotice" class="text-amber-700">{{ resetNotice }}</p>
           <p v-else-if="nominationTiming?.countdown" :class="nominationTiming?.tone === 'success' ? 'text-emerald-700' : 'text-amber-700'">
             {{ nominationTiming.label }} <span class="font-semibold">{{ nominationTiming.countdown.text }}</span>

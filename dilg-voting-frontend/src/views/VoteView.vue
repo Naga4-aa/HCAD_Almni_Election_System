@@ -20,11 +20,18 @@ const consent = ref(false)
 const now = ref(Date.now())
 const lastElectionId = ref(null)
 
-const phase = computed(() => election.value?.phase || 'closed')
+const isDemoMode = computed(() => election.value?.mode === 'demo')
+const phase = computed(() => {
+  if (isDemoMode.value && election.value?.demo_phase) {
+    return election.value.demo_phase
+  }
+  return election.value?.phase || 'closed'
+})
 const votingOpen = computed(() => phase.value === 'voting')
 const hasActiveElection = computed(() => !!election.value && election.value.is_active)
 const hasTimeline = computed(() => {
   const e = election.value
+  if (isDemoMode.value) return true
   if (!e || !e.is_active) return false
   const required = [e.nomination_start, e.nomination_end, e.voting_start, e.voting_end]
   return required.every((v) => {
@@ -34,13 +41,22 @@ const hasTimeline = computed(() => {
 })
 
 const resultsPostedVisible = computed(() => {
+  if (isDemoMode.value) return false
   if (!election.value?.results_published) return false
   return ['closed', 'closed_pending_results'].includes(phase.value)
 })
 
-const showBallot = computed(() => hasActiveElection.value && hasTimeline.value && votingOpen.value)
+const showBallot = computed(() => hasActiveElection.value && (hasTimeline.value || isDemoMode.value) && votingOpen.value)
 
 const votingTiming = computed(() => {
+  if (isDemoMode.value) {
+    return {
+      label: 'Demo mode',
+      countdown: null,
+      detail: `Phase: ${phase.value}`,
+      tone: 'info',
+    }
+  }
   if (!hasActiveElection.value || !hasTimeline.value) return null
   const start = toMs(election.value.voting_start)
   const end = toMs(election.value.voting_end)
@@ -92,6 +108,7 @@ const votingTiming = computed(() => {
 
 const resetNotice = computed(() => {
   if (!election.value) return 'No active election. Waiting for admin to open nominations/voting.'
+  if (isDemoMode.value) return 'Demo mode active. Phases are controlled manually by the admin.'
   if (!election.value.is_active) return 'Election timeline reset. Please check back once admin reactivates.'
   if (!hasTimeline.value) return 'Timeline not set. Waiting for admin to provide dates.'
   if (election.value.results_published && !resultsPostedVisible.value) {

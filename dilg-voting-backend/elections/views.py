@@ -4,6 +4,10 @@ import random
 
 from django.contrib.auth import authenticate, get_user_model
 from django.core import signing
+from django.core.mail import send_mail
+from django.conf import settings
+from django.core.mail import send_mail
+from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
 from rest_framework import status
@@ -20,6 +24,7 @@ from .models import (
     Vote,
     ElectionReminder,
     generate_pin,
+    POSITION_CHOICES,
 )
 from .serializers import (
     BallotSubmitSerializer,
@@ -140,9 +145,19 @@ def positions_list(request):
     election = get_active_election()
     if not election:
         return Response([], status=200)
-    positions = Position.objects.filter(election=election, is_active=True).order_by(
-        "display_order", "name"
-    )
+    positions_qs = Position.objects.filter(election=election, is_active=True)
+    if not positions_qs.exists():
+        # Seed default positions if none exist for the active election
+        for idx, (code, _label) in enumerate(POSITION_CHOICES):
+            Position.objects.create(
+                election=election,
+                name=code,
+                display_order=idx,
+                seats=1,
+                is_active=True,
+            )
+        positions_qs = Position.objects.filter(election=election, is_active=True)
+    positions = positions_qs.order_by("display_order", "name")
     return Response(PositionSerializer(positions, many=True).data)
 
 
@@ -456,6 +471,8 @@ def admin_voters(request):
         return Response(serializer.errors, status=400)
 
     data = serializer.validated_data
+    # Force campus to the Digos City chapter for this deployment.
+    data["campus_chapter"] = "Digos City"
     raw_pin = data.pop("pin", "").strip() or None
     if not raw_pin:
         raw_pin = generate_pin()
@@ -598,28 +615,19 @@ def admin_reminders(request):
     return Response(ElectionReminderSerializer(reminder).data, status=201)
 
 
-@api_view(["GET", "PUT"])
+@api_view(["GET", "PUT", "POST"])
 def admin_active_election(request):
     """
     GET: return the active election with timelines
+    POST: create a new election with timelines
     PUT: update nomination/voting windows and is_active
     """
     admin = get_admin_from_request(request)
     if not admin:
         return Response({"error": "Admin authentication required"}, status=403)
 
-    election = get_active_election()
-    if not election:
-        # Fallback to the most recent election so the admin UI can still edit
-        election = Election.objects.order_by("-nomination_start", "-id").first()
-        if not election:
-            return Response({"error": "No election configured"}, status=404)
-
-    if request.method == "GET":
-        return Response(ElectionSerializer(election).data)
-
-    # PUT
     payload = request.data or {}
+
     def parse_dt(key):
         val = payload.get(key)
         if not val:
@@ -632,33 +640,123 @@ def admin_active_election(request):
         except Exception:
             raise ValueError(f"Invalid datetime for {key}")
 
-    try:
-        nomination_start = parse_dt("nomination_start")
-        nomination_end = parse_dt("nomination_end")
-        voting_start = parse_dt("voting_start")
-        voting_end = parse_dt("voting_end")
-        results_at = parse_dt("results_at")
-    except ValueError as exc:
-        return Response({"error": str(exc)}, status=400)
+    def validate_windows():
+        try:
+            nomination_start = parse_dt("nomination_start")
+            nomination_end = parse_dt("nomination_end")
+            voting_start = parse_dt("voting_start")
+            voting_end = parse_dt("voting_end")
+            results_at = parse_dt("results_at")
+        except ValueError as exc:
+            return None, {"error": str(exc)}
 
-    if nomination_start and nomination_end and nomination_end <= nomination_start:
-        return Response({"error": "Nomination end must be after start"}, status=400)
-    if voting_start and voting_end and voting_end <= voting_start:
-        return Response({"error": "Voting end must be after start"}, status=400)
-    if nomination_end and voting_start and voting_start <= nomination_end:
-        return Response({"error": "Voting start must be after nomination end"}, status=400)
+        if nomination_start and nomination_end and nomination_end <= nomination_start:
+            return None, {"error": "Nomination end must be after start"}
+        if voting_start and voting_end and voting_end <= voting_start:
+            return None, {"error": "Voting end must be after start"}
+        if nomination_end and voting_start and voting_start <= nomination_end:
+            return None, {"error": "Voting start must be after nomination end"}
+
+        return {
+            "nomination_start": nomination_start,
+            "nomination_end": nomination_end,
+            "voting_start": voting_start,
+            "voting_end": voting_end,
+            "results_at": results_at,
+        }, None
+
+    if request.method == "POST":
+        parsed, error = validate_windows()
+        if error:
+            return Response(error, status=400)
+
+        # Require timelines on creation so the election is usable.
+        required_fields = [
+            parsed["nomination_start"],
+            parsed["nomination_end"],
+            parsed["voting_start"],
+            parsed["voting_end"],
+        ]
+        if not all(required_fields):
+            return Response({"error": "Provide nomination and voting windows to create an election"}, status=400)
+
+        name = (payload.get("name") or "").strip() or f"HCAD Alumni Election {timezone.now().year}"
+        description = payload.get("description", "").strip()
+        is_active = bool(payload.get("is_active", True))
+
+        previous_election = Election.objects.order_by("-nomination_start", "-id").first()
+        election = Election.objects.create(
+            name=name,
+            description=description,
+            nomination_start=parsed["nomination_start"],
+            nomination_end=parsed["nomination_end"],
+            voting_start=parsed["voting_start"],
+            voting_end=parsed["voting_end"],
+            results_at=parsed["results_at"],
+            is_active=is_active,
+        )
+
+        # Auto-provision positions from the latest election, or fall back to defaults.
+        positions_source = (
+            previous_election if previous_election and previous_election.id != election.id else None
+        )
+        created_positions = 0
+        if positions_source:
+            for pos in Position.objects.filter(election=positions_source):
+                Position.objects.create(
+                    election=election,
+                    name=pos.name,
+                    is_active=pos.is_active,
+                    seats=pos.seats,
+                    display_order=pos.display_order,
+                )
+                created_positions += 1
+        if not created_positions:
+            for idx, (code, _label) in enumerate(POSITION_CHOICES):
+                Position.objects.create(
+                    election=election,
+                    name=code,
+                    display_order=idx,
+                    seats=1,
+                    is_active=True,
+                )
+
+        return Response(ElectionSerializer(election).data, status=201)
+
+    election = get_active_election()
+    if not election:
+        # Fallback to the most recent election so the admin UI can still edit
+        election = Election.objects.order_by("-nomination_start", "-id").first()
+        if not election:
+            return Response({"error": "No election configured"}, status=404)
+
+    if request.method == "GET":
+        return Response(ElectionSerializer(election).data)
+
+    # PUT
+    parsed, error = validate_windows()
+    if error:
+        return Response(error, status=400)
 
     fields = {}
-    if nomination_start:
-        fields["nomination_start"] = nomination_start
-    if nomination_end:
-        fields["nomination_end"] = nomination_end
-    if voting_start:
-        fields["voting_start"] = voting_start
-    if voting_end:
-        fields["voting_end"] = voting_end
-    if results_at:
-        fields["results_at"] = results_at
+    if "name" in payload:
+        name_val = (payload.get("name") or "").strip()
+        if not name_val:
+            return Response({"error": "Election name cannot be empty"}, status=400)
+        fields["name"] = name_val
+    if "description" in payload:
+        # Allow clearing description
+        fields["description"] = (payload.get("description") or "").strip()
+    if parsed["nomination_start"]:
+        fields["nomination_start"] = parsed["nomination_start"]
+    if parsed["nomination_end"]:
+        fields["nomination_end"] = parsed["nomination_end"]
+    if parsed["voting_start"]:
+        fields["voting_start"] = parsed["voting_start"]
+    if parsed["voting_end"]:
+        fields["voting_end"] = parsed["voting_end"]
+    if parsed["results_at"]:
+        fields["results_at"] = parsed["results_at"]
     if "is_active" in payload:
         fields["is_active"] = bool(payload.get("is_active"))
 
@@ -696,6 +794,55 @@ def admin_publish_results(request):
         election.results_published_at = None
     election.save(update_fields=["results_published", "results_published_at"])
 
+    return Response(ElectionSerializer(election).data)
+
+
+@api_view(["POST"])
+def admin_demo_phase(request):
+    """
+    Demo controls: open/close nomination or voting without manual date input.
+    action: open_nomination, close_nomination, open_voting, close_voting
+    """
+    admin = get_admin_from_request(request)
+    if not admin:
+        return Response({"error": "Admin authentication required"}, status=403)
+
+    action = (request.data.get("action") or "").strip()
+    election = get_active_election() or Election.objects.order_by("-nomination_start", "-id").first()
+    if not election:
+        return Response({"error": "No election found"}, status=404)
+
+    now = timezone.now()
+    if action == "open_nomination":
+        election.nomination_start = now - timezone.timedelta(minutes=1)
+        election.nomination_end = now + timezone.timedelta(days=30)
+        election.voting_start = None
+        election.voting_end = None
+        election.is_active = True
+    elif action == "close_nomination":
+        election.nomination_start = election.nomination_start or (now - timezone.timedelta(days=1))
+        election.nomination_end = now - timezone.timedelta(minutes=1)
+    elif action == "open_voting":
+        election.nomination_start = election.nomination_start or (now - timezone.timedelta(days=2))
+        election.nomination_end = election.nomination_end or (now - timezone.timedelta(hours=1))
+        election.voting_start = now - timezone.timedelta(minutes=1)
+        election.voting_end = now + timezone.timedelta(days=30)
+        election.is_active = True
+    elif action == "close_voting":
+        election.voting_start = election.voting_start or (now - timezone.timedelta(days=1))
+        election.voting_end = now - timezone.timedelta(minutes=1)
+    else:
+        return Response({"error": "Invalid action"}, status=400)
+
+    election.save(
+        update_fields=[
+            "nomination_start",
+            "nomination_end",
+            "voting_start",
+            "voting_end",
+            "is_active",
+        ]
+    )
     return Response(ElectionSerializer(election).data)
 
 

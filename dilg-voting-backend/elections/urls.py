@@ -32,6 +32,7 @@ urlpatterns = [
     path("admin/reminders/", views.admin_reminders),
     path("admin/election/active/", views.admin_active_election),
     path("admin/election/publish/", views.admin_publish_results),
+    path("admin/election/demo-phase/", views.admin_demo_phase),
     path("admin/reset-voters/", views.admin_reset_voters),
     path("admin/reset-election/", views.admin_reset_election),
 ]
