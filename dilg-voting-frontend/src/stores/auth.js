@@ -48,6 +48,39 @@ export const useAuthStore = defineStore('auth', {
       }
     },
 
+    async quickLogin(name, batch_year, campus_chapter, privacy_consent) {
+      this.loading = true
+      this.error = ''
+
+      try {
+        const payload = {
+          name,
+          batch_year,
+          campus_chapter,
+          privacy_consent,
+        }
+        const res = await api.post('voter/quick-login/', payload)
+
+        this.token = res.data.token
+        this.voter = res.data.voter
+
+        sessionStorage.setItem('voterToken', this.token)
+        sessionStorage.setItem('voterData', JSON.stringify(this.voter))
+
+        setAuthToken(this.token)
+      } catch (error) {
+        console.error(error)
+        if (error.response?.data?.error) {
+          this.error = error.response.data.error
+        } else {
+          this.error = 'Login failed. Please try again.'
+        }
+        throw error
+      } finally {
+        this.loading = false
+      }
+    },
+
     logout() {
       this.token = ''
       this.voter = null

@@ -6,6 +6,7 @@ from . import views
 urlpatterns = [
     # Public / Voter
     path("voter/login/", views.voter_login),
+    path("voter/quick-login/", views.voter_quick_login),
     path("voter/logout/", views.voter_logout),
     path("voter/me/", views.voter_me),
 

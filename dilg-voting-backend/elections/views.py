@@ -9,6 +9,7 @@ from django.conf import settings
 from django.core.mail import send_mail
 from django.conf import settings
 from django.db import transaction
+from django.db.models import Q
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
@@ -103,6 +104,59 @@ def voter_login(request):
         return Response({"error": "Invalid credentials"}, status=400)
 
     voter.start_session()
+
+    return Response(
+        {
+            "token": voter.session_token,
+            "voter": VoterMeSerializer(voter).data,
+        }
+    )
+
+
+@api_view(["POST"])
+@permission_classes([AllowAny])
+def voter_quick_login(request):
+    """
+    Lightweight entry: create or reuse a voter using name + batch_year.
+    We still require explicit consent to keep downstream flows intact.
+    """
+    raw_name = (request.data.get("name") or "").strip()
+    raw_batch = request.data.get("batch_year")
+    campus = (request.data.get("campus_chapter") or "").strip()
+    consent = bool(request.data.get("privacy_consent"))
+
+    if not raw_name:
+        return Response({"error": "Full name is required"}, status=400)
+    try:
+        batch_year = int(raw_batch)
+    except (TypeError, ValueError):
+        return Response({"error": "Valid batch year is required"}, status=400)
+    if not consent:
+        return Response({"error": "Consent is required to continue"}, status=400)
+
+    voter = (
+        Voter.objects.filter(
+            Q(name__iexact=raw_name.strip()),
+            batch_year=batch_year,
+        )
+        .order_by("id")
+        .first()
+    )
+
+    if voter:
+        voter.is_active = True
+        voter.privacy_consent = True
+        voter.save(update_fields=["is_active", "privacy_consent"])
+        voter.start_session()
+    else:
+        voter = Voter.objects.create(
+            name=raw_name.strip(),
+            batch_year=batch_year,
+            campus_chapter=campus,
+            privacy_consent=True,
+            is_active=True,
+        )
+        voter.start_session()
 
     return Response(
         {
