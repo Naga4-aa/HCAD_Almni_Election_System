@@ -31,13 +31,24 @@ api.interceptors.response.use(
     if (error.response && error.response.status === 401) {
       const authStore = useAuthStore()
       const adminStore = useAdminAuthStore()
-      if (authStore?.isAuthenticated) {
-        authStore.logout()
-        router.push('/login')
-      }
-      if (adminStore?.isAuthenticated) {
-        adminStore.logout()
+      const currentRoute = router.currentRoute.value
+      const isAdminRoute =
+        currentRoute?.name?.toString().startsWith('admin') || currentRoute?.path?.startsWith('/admin')
+
+      if (isAdminRoute) {
+        if (adminStore?.isAuthenticated) {
+          adminStore.logout()
+        }
         router.push('/admin-login')
+      } else {
+        // Default to the voter login unless the user is currently in an admin context
+        if (authStore?.isAuthenticated) {
+          authStore.logout()
+          router.push('/login')
+        } else if (adminStore?.isAuthenticated) {
+          adminStore.logout()
+          router.push('/admin-login')
+        }
       }
     }
     return Promise.reject(error)

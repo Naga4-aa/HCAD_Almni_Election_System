@@ -30,6 +30,8 @@ class ElectionSerializer(serializers.ModelSerializer):
             "results_published",
             "results_published_at",
             "is_active",
+            "mode",
+            "demo_phase",
             "phase",
         ]
 

@@ -631,44 +631,61 @@ def admin_active_election(request):
     payload = request.data or {}
 
     def parse_dt(key):
+        """
+        Parse a datetime string. Return a tuple of (value, provided_flag) so we can
+        distinguish between "not provided" and "explicitly cleared".
+        """
+        if key not in payload:
+            return None, False
         val = payload.get(key)
         if not val:
-            return None
+            # Explicit clear
+            return None, True
         try:
             dt = datetime.fromisoformat(val)
             if timezone.is_naive(dt):
                 dt = timezone.make_aware(dt, timezone.get_current_timezone())
-            return dt
+            return dt, True
         except Exception:
             raise ValueError(f"Invalid datetime for {key}")
 
     def validate_windows():
         try:
-            nomination_start = parse_dt("nomination_start")
-            nomination_end = parse_dt("nomination_end")
-            voting_start = parse_dt("voting_start")
-            voting_end = parse_dt("voting_end")
-            results_at = parse_dt("results_at")
+            nomination_start, ns_provided = parse_dt("nomination_start")
+            nomination_end, ne_provided = parse_dt("nomination_end")
+            voting_start, vs_provided = parse_dt("voting_start")
+            voting_end, ve_provided = parse_dt("voting_end")
+            results_at, ra_provided = parse_dt("results_at")
         except ValueError as exc:
-            return None, {"error": str(exc)}
+            return None, None, {"error": str(exc)}
 
         if nomination_start and nomination_end and nomination_end <= nomination_start:
-            return None, {"error": "Nomination end must be after start"}
+            return None, None, {"error": "Nomination end must be after start"}
         if voting_start and voting_end and voting_end <= voting_start:
-            return None, {"error": "Voting end must be after start"}
+            return None, None, {"error": "Voting end must be after start"}
         if nomination_end and voting_start and voting_start <= nomination_end:
-            return None, {"error": "Voting start must be after nomination end"}
+            return None, None, {"error": "Voting start must be after nomination end"}
 
-        return {
-            "nomination_start": nomination_start,
-            "nomination_end": nomination_end,
-            "voting_start": voting_start,
-            "voting_end": voting_end,
-            "results_at": results_at,
-        }, None
+        return (
+            {
+                "nomination_start": nomination_start,
+                "nomination_end": nomination_end,
+                "voting_start": voting_start,
+                "voting_end": voting_end,
+                "results_at": results_at,
+            },
+            {
+                "nomination_start": ns_provided,
+                "nomination_end": ne_provided,
+                "voting_start": vs_provided,
+                "voting_end": ve_provided,
+                "results_at": ra_provided,
+            },
+            None,
+        )
 
     if request.method == "POST":
-        parsed, error = validate_windows()
+        parsed, _provided, error = validate_windows()
         if error:
             return Response(error, status=400)
 
@@ -685,6 +702,7 @@ def admin_active_election(request):
         name = (payload.get("name") or "").strip() or f"HCAD Alumni Election {timezone.now().year}"
         description = payload.get("description", "").strip()
         is_active = bool(payload.get("is_active", True))
+        mode = (payload.get("mode") or "timeline").strip() or "timeline"
 
         previous_election = Election.objects.order_by("-nomination_start", "-id").first()
         election = Election.objects.create(
@@ -696,6 +714,7 @@ def admin_active_election(request):
             voting_end=parsed["voting_end"],
             results_at=parsed["results_at"],
             is_active=is_active,
+            mode=mode if mode in ("timeline", "demo") else "timeline",
         )
 
         # Auto-provision positions from the latest election, or fall back to defaults.
@@ -736,7 +755,7 @@ def admin_active_election(request):
         return Response(ElectionSerializer(election).data)
 
     # PUT
-    parsed, error = validate_windows()
+    parsed, provided, error = validate_windows()
     if error:
         return Response(error, status=400)
 
@@ -749,15 +768,23 @@ def admin_active_election(request):
     if "description" in payload:
         # Allow clearing description
         fields["description"] = (payload.get("description") or "").strip()
-    if parsed["nomination_start"]:
+    if "mode" in payload:
+        mode_val = (payload.get("mode") or "").strip()
+        if mode_val and mode_val not in ("timeline", "demo"):
+            return Response({"error": "Invalid mode"}, status=400)
+        if mode_val:
+            fields["mode"] = mode_val
+            if mode_val == "timeline":
+                fields["demo_phase"] = None
+    if provided.get("nomination_start"):
         fields["nomination_start"] = parsed["nomination_start"]
-    if parsed["nomination_end"]:
+    if provided.get("nomination_end"):
         fields["nomination_end"] = parsed["nomination_end"]
-    if parsed["voting_start"]:
+    if provided.get("voting_start"):
         fields["voting_start"] = parsed["voting_start"]
-    if parsed["voting_end"]:
+    if provided.get("voting_end"):
         fields["voting_end"] = parsed["voting_end"]
-    if parsed["results_at"]:
+    if provided.get("results_at"):
         fields["results_at"] = parsed["results_at"]
     if "is_active" in payload:
         fields["is_active"] = bool(payload.get("is_active"))
@@ -803,7 +830,7 @@ def admin_publish_results(request):
 def admin_demo_phase(request):
     """
     Demo controls: open/close nomination or voting without manual date input.
-    action: open_nomination, close_nomination, open_voting, close_voting
+    action: open_nomination, close_nomination, open_voting, close_voting, exit_demo
     """
     admin = get_admin_from_request(request)
     if not admin:
@@ -815,24 +842,32 @@ def admin_demo_phase(request):
         return Response({"error": "No election found"}, status=404)
 
     now = timezone.now()
+    election.mode = "demo"
     if action == "open_nomination":
         election.nomination_start = now - timezone.timedelta(minutes=1)
         election.nomination_end = now + timezone.timedelta(days=30)
         election.voting_start = None
         election.voting_end = None
         election.is_active = True
+        election.demo_phase = "nomination"
     elif action == "close_nomination":
         election.nomination_start = election.nomination_start or (now - timezone.timedelta(days=1))
         election.nomination_end = now - timezone.timedelta(minutes=1)
+        election.demo_phase = "between"
     elif action == "open_voting":
         election.nomination_start = election.nomination_start or (now - timezone.timedelta(days=2))
         election.nomination_end = election.nomination_end or (now - timezone.timedelta(hours=1))
         election.voting_start = now - timezone.timedelta(minutes=1)
         election.voting_end = now + timezone.timedelta(days=30)
         election.is_active = True
+        election.demo_phase = "voting"
     elif action == "close_voting":
         election.voting_start = election.voting_start or (now - timezone.timedelta(days=1))
         election.voting_end = now - timezone.timedelta(minutes=1)
+        election.demo_phase = "closed"
+    elif action == "exit_demo":
+        election.mode = "timeline"
+        election.demo_phase = None
     else:
         return Response({"error": "Invalid action"}, status=400)
 
@@ -843,6 +878,8 @@ def admin_demo_phase(request):
             "voting_start",
             "voting_end",
             "is_active",
+            "mode",
+            "demo_phase",
         ]
     )
     return Response(ElectionSerializer(election).data)
@@ -951,7 +988,7 @@ def admin_notifications(request):
     """
     Simple admin notifications inbox.
     - GET: ?history=1 to include hidden items; otherwise hides dismissed items.
-    - POST actions: mark_all_read, dismiss (ids list), delete (ids list)
+    - POST actions: mark_all_read, dismiss (ids list), delete (ids list), delete_all
     """
     admin = get_admin_from_request(request)
     if not admin:
@@ -982,5 +1019,8 @@ def admin_notifications(request):
     if action == "delete":
         Notification.objects.filter(id__in=ids).delete()
         return Response({"message": "Deleted"})
+    if action == "delete_all":
+        Notification.objects.all().delete()
+        return Response({"message": "All notifications deleted"})
 
     return Response({"error": "Invalid action"}, status=400)

@@ -41,6 +41,12 @@ class Election(models.Model):
     results_published = models.BooleanField(default=False)
     results_published_at = models.DateTimeField(blank=True, null=True)
     is_active = models.BooleanField(default=True)
+    mode = models.CharField(
+        max_length=20,
+        default="timeline",
+        choices=(("timeline", "Timeline"), ("demo", "Demo")),
+    )
+    demo_phase = models.CharField(max_length=30, blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

@@ -3,8 +3,9 @@ import api, { setAuthToken } from '../api'
 
 export const useAuthStore = defineStore('auth', {
   state: () => ({
-    token: localStorage.getItem('voterToken') || '',
-    voter: localStorage.getItem('voterData') ? JSON.parse(localStorage.getItem('voterData')) : null,
+    // Use sessionStorage so each browser tab keeps its own voter session instead of sharing
+    token: sessionStorage.getItem('voterToken') || '',
+    voter: sessionStorage.getItem('voterData') ? JSON.parse(sessionStorage.getItem('voterData')) : null,
     loading: false,
     error: '',
   }),
@@ -30,8 +31,8 @@ export const useAuthStore = defineStore('auth', {
         this.token = res.data.token
         this.voter = res.data.voter
 
-        localStorage.setItem('voterToken', this.token)
-        localStorage.setItem('voterData', JSON.stringify(this.voter))
+        sessionStorage.setItem('voterToken', this.token)
+        sessionStorage.setItem('voterData', JSON.stringify(this.voter))
 
         setAuthToken(this.token)
       } catch (error) {
@@ -51,8 +52,8 @@ export const useAuthStore = defineStore('auth', {
       this.token = ''
       this.voter = null
       this.error = ''
-      localStorage.removeItem('voterToken')
-      localStorage.removeItem('voterData')
+      sessionStorage.removeItem('voterToken')
+      sessionStorage.removeItem('voterData')
       setAuthToken(null)
     },
   },

@@ -1,6 +1,6 @@
 ﻿<!-- src/views/AdminDashboard.vue -->
 <script setup>
-import { ref, onMounted, watch } from 'vue'
+import { ref, onMounted, watch, computed } from 'vue'
 import api from '../api'
 import { useAdminAuthStore } from '../stores/adminAuth'
 import { useRouter } from 'vue-router'
@@ -34,6 +34,7 @@ const electionForm = ref({
   voting_end: '',
   results_at: '',
   is_active: true,
+  auto_publish_results: true,
 })
 const notifications = ref([])
 const unreadNotifications = ref(0)
@@ -42,6 +43,7 @@ const notificationsError = ref('')
 const notificationsCollapsed = ref(false)
 const showHistory = ref(false)
 const recentVoters = ref([])
+const voterSearch = ref('')
 
 const pruneRecentVoters = () => {
   const cutoff = Date.now() - 30 * 60 * 1000 // 30 minutes
@@ -67,10 +69,45 @@ const resettingVoters = ref(false)
 const resetPins = ref(false)
 const resettingElection = ref(false)
 
+// Themed confirm dialog
+const confirmDialog = ref({
+  open: false,
+  title: '',
+  message: '',
+  confirmText: 'Confirm',
+  cancelText: 'Cancel',
+  tone: 'neutral', // 'neutral' | 'danger'
+})
+let confirmResolver = null
+
+const askConfirm = (options = {}) => {
+  if (confirmResolver) confirmResolver(false)
+  return new Promise((resolve) => {
+    confirmResolver = resolve
+    confirmDialog.value = {
+      open: true,
+      title: 'Please confirm',
+      message: '',
+      confirmText: 'Confirm',
+      cancelText: 'Cancel',
+      tone: 'neutral',
+      ...options,
+    }
+  })
+}
+
+const handleConfirm = (result) => {
+  if (confirmResolver) {
+    confirmResolver(result)
+  }
+  confirmResolver = null
+  confirmDialog.value = { ...confirmDialog.value, open: false }
+}
+
 // UI state: show one section at a time
 const activeSection = ref(localStorage.getItem('adminActiveSection') || 'stats')
 const sections = [
-  { key: 'stats', label: 'Stats' },
+  { key: 'stats', label: 'Overview' },
   { key: 'tally', label: 'Tally' },
   { key: 'timeline', label: 'Timeline' },
   { key: 'nominations', label: 'Nominations' },
@@ -154,6 +191,22 @@ const markAllNotificationsRead = async () => {
   }
 }
 
+const deleteAllNotifications = async () => {
+  const confirmed = await askConfirm({
+    title: 'Delete notifications',
+    message: 'Delete all notifications? This cannot be undone.',
+    confirmText: 'Delete all',
+    tone: 'danger',
+  })
+  if (!confirmed) return
+  try {
+    await api.post('admin/notifications/', { action: 'delete_all' })
+    await loadNotifications()
+  } catch (err) {
+    notificationsError.value = err.response?.data?.error || 'Failed to delete notifications.'
+  }
+}
+
 const dismissNotification = async (id) => {
   try {
     await api.post('admin/notifications/', { action: 'dismiss', ids: [id] })
@@ -173,7 +226,13 @@ const deleteNotification = async (id) => {
 }
 
 const resetVoterPin = async (voter) => {
-  if (!window.confirm(`Reset PIN for ${voter.name}? This will end any active session.`)) return
+  const confirmed = await askConfirm({
+    title: 'Reset PIN',
+    message: `Reset PIN for ${voter.name}? This will end any active session.`,
+    confirmText: 'Reset PIN',
+    tone: 'danger',
+  })
+  if (!confirmed) return
   try {
     const res = await api.post(`admin/voters/${voter.id}/reset-pin/`)
     alert(`PIN reset.\nVoter ID: ${res.data.voter_id}\nPIN: ${res.data.pin}`)
@@ -242,6 +301,7 @@ const loadElection = async () => {
       voting_end: toInput(res.data.voting_end),
       results_at: toInput(res.data.results_at),
       is_active: res.data.is_active,
+      auto_publish_results: res.data.auto_publish_results ?? true,
     }
     electionError.value = ''
   } catch (err) {
@@ -258,6 +318,7 @@ const loadElection = async () => {
         voting_end: '',
         results_at: '',
         is_active: true,
+        auto_publish_results: true,
       }
       electionError.value = ''
     } else {
@@ -286,6 +347,7 @@ const saveElection = async () => {
       voting_end: electionForm.value.voting_end,
       results_at: electionForm.value.results_at,
       is_active: electionForm.value.is_active,
+      auto_publish_results: electionForm.value.auto_publish_results,
       mode: 'timeline',
     }
     const res = isUpdate
@@ -369,7 +431,12 @@ const switchMode = async (mode) => {
 }
 
 const resetElection = async () => {
-  const confirmReset = window.confirm('Reset votes, nominations, and voter statuses for this election?')
+  const confirmReset = await askConfirm({
+    title: 'Reset election',
+    message: 'Reset votes, nominations, and voter statuses for this election?',
+    confirmText: 'Reset election',
+    tone: 'danger',
+  })
   if (!confirmReset) return
   resettingElection.value = true
   try {
@@ -418,6 +485,17 @@ const loadVoters = async () => {
   }
 }
 
+const filteredVoters = computed(() => {
+  const term = voterSearch.value.trim().toLowerCase()
+  if (!term) return voters.value
+  return voters.value.filter((v) => {
+    const name = (v.name || '').toLowerCase()
+    const id = (v.voter_id || '').toLowerCase()
+    const batch = String(v.batch_year || '').toLowerCase()
+    return name.includes(term) || id.includes(term) || batch.includes(term)
+  })
+})
+
 const openAddVoter = () => {
   newVoter.value = {
     name: '',
@@ -465,7 +543,14 @@ const submitVoter = async () => {
 }
 
 const resetAllVoters = async () => {
-  const confirmReset = window.confirm('Reset has_voted and sessions for all voters?')
+  const confirmReset = await askConfirm({
+    title: 'Reset voters',
+    message: resetPins.value
+      ? 'Reset has_voted, sessions, and PINs for all voters?'
+      : 'Reset has_voted and sessions for all voters?',
+    confirmText: 'Reset voters',
+    tone: 'danger',
+  })
   if (!confirmReset) return
   resettingVoters.value = true
   try {
@@ -508,106 +593,115 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="space-y-4">
-    <div class="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 shadow-sm flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-      <div class="space-y-1">
-        <p class="text-xs uppercase tracking-wide text-emerald-600 font-semibold">Admin</p>
-        <h2 class="text-lg font-semibold leading-tight">COMELEC Dashboard</h2>
-        <p class="text-xs text-slate-500">Live turnout, tallies, and nominations.</p>
-      </div>
-      <div class="flex flex-wrap gap-2 items-center justify-start sm:justify-end w-full sm:w-auto">
-        <button @click="resetElection" :disabled="resettingElection" class="text-sm px-3 py-2 rounded-lg border border-rose-400 text-rose-700 bg-rose-50 hover:bg-rose-100 disabled:opacity-60">{{ resettingElection ? 'Resetting.' : 'Reset election' }}</button>
-        <button @click="logout" class="text-sm px-3 py-2 rounded-lg border border-slate-300 hover:bg-slate-100">Logout</button>
-      </div>
-    </div>
-
-    <div class="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 shadow-sm flex flex-col gap-3">
-      <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-        <div class="flex flex-wrap items-center gap-2">
-          <span class="text-sm font-semibold">Notifications</span>
-          <span class="text-[11px] px-2 py-1 rounded-full" :class="unreadNotifications ? 'bg-rose-100 text-rose-700' : 'bg-emerald-50 text-emerald-700'">
-            {{ unreadNotifications }} unread
-          </span>
-          <button @click="notificationsCollapsed = !notificationsCollapsed" class="text-xs px-3 py-1.5 rounded-lg border border-slate-300 hover:bg-slate-100">
-            {{ notificationsCollapsed ? 'Expand' : 'Collapse' }}
-          </button>
-          <button @click="showHistory = !showHistory; loadNotifications()" class="text-xs px-3 py-1.5 rounded-lg border border-slate-300 hover:bg-slate-100">
-            {{ showHistory ? 'Hide history' : 'Show history' }}
+  <div class="space-y-6 w-full max-w-screen-2xl mx-auto px-3 sm:px-4 lg:px-6">
+    <div class="flex flex-col lg:grid lg:grid-cols-[380px_minmax(0,1fr)] gap-6 w-full">
+      <aside class="w-full lg:w-auto lg:sticky lg:top-16 bg-white/95 border border-emerald-100 rounded-2xl shadow-sm p-4 space-y-4 lg:min-h-[calc(100vh-140px)] overflow-auto flex flex-col">
+        <div class="space-y-1">
+          <p class="text-[11px] uppercase tracking-wide text-emerald-600 font-semibold">Admin</p>
+          <h2 class="text-lg font-semibold leading-tight">COMELEC Dashboard</h2>
+          <p class="text-xs text-slate-500">Live turnout, tallies, and nominations.</p>
+        </div>
+        <div class="text-[11px] uppercase tracking-wide text-slate-500 font-semibold px-1">Navigation</div>
+        <div class="flex lg:flex-col gap-2 overflow-x-auto lg:overflow-visible px-1">
+          <button
+            v-for="s in sections"
+            :key="s.key"
+            @click="activeSection = s.key"
+            class="text-sm w-full text-left px-3 py-2 rounded-xl border transition flex items-center gap-2 whitespace-nowrap"
+            :class="activeSection === s.key ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm' : 'border-slate-200 text-slate-700 hover:bg-emerald-50'"
+          >
+            {{ s.label }}
           </button>
         </div>
-        <div class="flex flex-wrap gap-2 justify-start lg:justify-end">
-          <button @click="loadNotifications" class="text-xs px-3 py-1.5 rounded-lg border border-slate-300 hover:bg-slate-100" :disabled="notificationsLoading">Refresh</button>
-          <button @click="markAllNotificationsRead" class="text-xs px-3 py-1.5 rounded-lg border border-emerald-400 text-emerald-700 bg-emerald-50" :disabled="notificationsLoading || unreadNotifications === 0">Mark all read</button>
+        <div class="flex-1"></div>
+        <div class="flex flex-col gap-2 pt-2">
+          <button @click="resetElection" :disabled="resettingElection" class="text-sm px-3 py-2 rounded-lg border border-rose-400 text-rose-700 bg-rose-50 hover:bg-rose-100 disabled:opacity-60">
+            {{ resettingElection ? 'Resetting.' : 'Reset election' }}
+          </button>
+          <button @click="logout" class="text-sm px-3 py-2 rounded-lg border border-slate-300 hover:bg-slate-100">
+            Logout
+          </button>
         </div>
-      </div>
-      <p v-if="notificationsError" class="text-[11px] text-rose-600">{{ notificationsError }}</p>
-      <div v-else-if="notificationsCollapsed" class="text-[11px] text-slate-600">Notifications collapsed.</div>
-      <div v-else-if="notificationsLoading" class="text-[11px] text-slate-600">Loading notifications...</div>
-      <div v-else-if="!notifications.length" class="text-[11px] text-slate-500">No notifications yet.</div>
-      <ul
-        v-else
-        class="divide-y divide-slate-200 text-[11px] text-slate-700 pr-1"
-        style="max-height: 260px; overflow-y: auto;"
-      >
-        <li v-for="n in notifications" :key="n.id" class="py-2 flex items-start gap-2">
-          <span class="mt-0.5 h-2 w-2 rounded-full" :class="n.is_read ? 'bg-slate-300' : 'bg-emerald-500'"></span>
-          <div class="flex-1">
-            <p class="font-semibold capitalize text-slate-800">{{ n.type }}</p>
-            <p class="text-slate-700">{{ n.message }}</p>
-            <p class="text-[10px] text-slate-500">{{ formatDateTime(n.created_at) }}</p>
+      </aside>
+
+      <div class="flex-1 space-y-6 min-w-0 w-full">
+        <div class="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 shadow-sm flex flex-col gap-3 w-full">
+          <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div class="flex flex-wrap items-center gap-2">
+              <span class="text-sm font-semibold">Notifications</span>
+              <span class="text-[11px] px-2 py-1 rounded-full" :class="unreadNotifications ? 'bg-rose-100 text-rose-700' : 'bg-emerald-50 text-emerald-700'">
+                {{ unreadNotifications }} unread
+              </span>
+              <button @click="notificationsCollapsed = !notificationsCollapsed" class="text-xs px-3 py-1.5 rounded-lg border border-slate-300 hover:bg-slate-100">
+                {{ notificationsCollapsed ? 'Expand' : 'Collapse' }}
+              </button>
+              <button @click="showHistory = !showHistory; loadNotifications()" class="text-xs px-3 py-1.5 rounded-lg border border-slate-300 hover:bg-slate-100">
+                {{ showHistory ? 'Hide history' : 'Show history' }}
+              </button>
+            </div>
+            <div class="flex flex-wrap gap-2 justify-start lg:justify-end">
+              <button @click="loadNotifications" class="text-xs px-3 py-1.5 rounded-lg border border-slate-300 hover:bg-slate-100" :disabled="notificationsLoading">Refresh</button>
+              <button @click="markAllNotificationsRead" class="text-xs px-3 py-1.5 rounded-lg border border-emerald-400 text-emerald-700 bg-emerald-50" :disabled="notificationsLoading || unreadNotifications === 0">Mark all read</button>
+              <button @click="deleteAllNotifications" class="text-xs px-3 py-1.5 rounded-lg border border-rose-300 text-rose-700 bg-rose-50" :disabled="notificationsLoading || !notifications.length">Delete all</button>
+            </div>
           </div>
-          <div class="flex gap-1">
-            <button @click="dismissNotification(n.id)" class="text-[10px] px-2 py-1 rounded border border-slate-300 hover:bg-slate-100">Hide</button>
-            <button @click="deleteNotification(n.id)" class="text-[10px] px-2 py-1 rounded border border-rose-300 text-rose-700 hover:bg-rose-50">Delete</button>
-          </div>
-        </li>
-      </ul>
-      <p v-if="showHistory && !notificationsCollapsed" class="text-[10px] text-slate-500">History view includes hidden items; delete removes them permanently.</p>
-    </div>
+          <p v-if="notificationsError" class="text-[11px] text-rose-600">{{ notificationsError }}</p>
+          <div v-else-if="notificationsCollapsed" class="text-[11px] text-slate-600">Notifications collapsed.</div>
+          <div v-else-if="notificationsLoading" class="text-[11px] text-slate-600">Loading notifications...</div>
+          <div v-else-if="!notifications.length" class="text-[11px] text-slate-500">No notifications yet.</div>
+          <ul
+            v-else
+            class="divide-y divide-slate-200 text-[11px] text-slate-700 pr-1"
+            style="max-height: 260px; overflow-y: auto;"
+          >
+            <li v-for="n in notifications" :key="n.id" class="py-2 flex items-start gap-2">
+              <span class="mt-0.5 h-2 w-2 rounded-full" :class="n.is_read ? 'bg-slate-300' : 'bg-emerald-500'"></span>
+              <div class="flex-1">
+                <p class="font-semibold capitalize text-slate-800">{{ n.type }}</p>
+                <p class="text-slate-700">{{ n.message }}</p>
+                <p class="text-[10px] text-slate-500">{{ formatDateTime(n.created_at) }}</p>
+              </div>
+              <div class="flex gap-1">
+                <button @click="dismissNotification(n.id)" class="text-[10px] px-2 py-1 rounded border border-slate-300 hover:bg-slate-100">Hide</button>
+                <button @click="deleteNotification(n.id)" class="text-[10px] px-2 py-1 rounded border border-rose-300 text-rose-700 hover:bg-rose-50">Delete</button>
+              </div>
+            </li>
+          </ul>
+          <p v-if="showHistory && !notificationsCollapsed" class="text-[10px] text-slate-500">History view includes hidden items; delete removes them permanently.</p>
+        </div>
 
-    <div v-if="loading" class="text-sm text-slate-500">Loading dashboard.</div>
-    <p v-if="errorMessage" class="text-sm text-rose-600">{{ errorMessage }}</p>
+        <div v-if="loading" class="text-sm text-slate-500">Loading dashboard.</div>
+        <p v-if="errorMessage" class="text-sm text-rose-600">{{ errorMessage }}</p>
 
-    <div class="sticky top-16 z-10 bg-slate-50/90 backdrop-blur rounded-2xl border border-slate-200 px-2 sm:px-3 py-2 flex gap-2 overflow-x-auto">
-      <button
-        v-for="s in sections"
-        :key="s.key"
-        @click="activeSection = s.key"
-        class="text-xs px-3 py-1.5 rounded-full border whitespace-nowrap"
-        :class="activeSection === s.key ? 'bg-emerald-600 text-white border-emerald-600' : 'border-slate-300 hover:bg-slate-100'"
-      >
-        {{ s.label }}
-      </button>
-    </div>
 
-    <div v-if="activeSection === 'stats' && stats" id="stats" class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-      <div class="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 shadow-sm">
+    <div v-if="activeSection === 'stats' && stats" id="stats" class="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 w-full">
+      <div class="bg-gradient-to-br from-emerald-50 via-white to-slate-50 rounded-2xl border border-emerald-100 p-4 sm:p-5 shadow-sm">
         <p class="text-xs text-slate-500">Total voters</p>
         <p class="text-2xl font-semibold">{{ stats.total_voters }}</p>
       </div>
-      <div class="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 shadow-sm">
+      <div class="bg-gradient-to-br from-emerald-50 via-white to-slate-50 rounded-2xl border border-emerald-100 p-4 sm:p-5 shadow-sm">
         <p class="text-xs text-slate-500">Voted</p>
         <p class="text-2xl font-semibold">{{ stats.voted_count }}</p>
       </div>
-      <div class="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 shadow-sm">
+      <div class="bg-gradient-to-br from-emerald-50 via-white to-slate-50 rounded-2xl border border-emerald-100 p-4 sm:p-5 shadow-sm">
         <p class="text-xs text-slate-500">Turnout</p>
         <p class="text-2xl font-semibold">{{ stats.turnout_percent }}%</p>
       </div>
     </div>
 
-    <div v-if="activeSection === 'tally'" id="tally" class="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 shadow-sm">
+    <div v-if="activeSection === 'tally'" id="tally" class="bg-gradient-to-br from-emerald-50 via-white to-slate-50 rounded-2xl border border-emerald-100 p-4 sm:p-5 shadow-sm">
       <h3 class="text-sm font-semibold mb-3">Per-position tally</h3>
       <div class="grid gap-4 md:grid-cols-2">
-        <div v-for="pos in tally" :key="pos.position_id" class="border border-slate-100 rounded-xl p-3 space-y-3">
+        <div v-for="pos in tally" :key="pos.position_id" class="border border-emerald-100 rounded-xl p-3 space-y-3 bg-white/90 shadow-sm">
           <div class="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
             <p class="text-sm font-semibold">{{ pos.position }}</p>
             <span class="text-[11px] text-slate-500">{{ pos.candidates.length }} candidate(s)</span>
           </div>
           <div class="space-y-2">
-            <div v-for="cand in pos.candidates" :key="cand.candidate_id" class="text-sm">
-              <div class="flex justify-between mb-1">
+            <div v-for="cand in pos.candidates" :key="cand.candidate_id" class="text-sm rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+              <div class="flex justify-between mb-1 items-center gap-2">
                 <span class="font-semibold text-slate-800">{{ cand.full_name }}</span>
-                <span class="font-semibold text-slate-700">{{ cand.votes }} vote(s)</span>
+                <span class="font-semibold text-slate-700 text-xs px-2 py-0.5 rounded-full bg-white border border-slate-200">{{ cand.votes }} vote(s)</span>
               </div>
               <div class="h-2.5 rounded-full bg-slate-100 overflow-hidden">
                 <div
@@ -626,7 +720,7 @@ onMounted(async () => {
         <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between mb-3">
           <h4 class="text-sm font-semibold">Published results view</h4>
           <button
-            class="text-xs px-3 py-1.5 rounded-lg border border-slate-200 hover:bg-emerald-50"
+            class="text-xs px-3 py-1.5 rounded-lg border border-emerald-200 bg-white text-emerald-800 hover:bg-emerald-50 shadow-sm"
             @click="loadPublishedResults"
           >
             Refresh
@@ -637,7 +731,7 @@ onMounted(async () => {
           <div
             v-for="pos in publishedResults.positions || []"
             :key="pos.position_id"
-            class="border border-slate-100 rounded-xl p-3 space-y-2"
+            class="border border-emerald-100 rounded-xl p-3 space-y-2 bg-white/90 shadow-sm"
           >
             <div class="flex items-center justify-between">
               <p class="text-sm font-semibold">{{ pos.position }}</p>
@@ -661,7 +755,7 @@ onMounted(async () => {
       </div>
     </div>
 
-    <div v-if="activeSection === 'timeline'" id="timeline" class="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 shadow-sm space-y-3">
+    <div v-if="activeSection === 'timeline'" id="timeline" class="bg-gradient-to-br from-emerald-50 via-white to-slate-50 rounded-2xl border border-emerald-100 p-4 sm:p-5 shadow-sm space-y-3">
       <div class="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
         <h3 class="text-sm font-semibold leading-tight">Election timeline</h3>
         <span class="text-[11px] text-slate-500">Nomination & voting windows</span>
@@ -692,32 +786,36 @@ onMounted(async () => {
       <div v-if="timelineMode === 'timeline'" class="grid gap-3 sm:grid-cols-2">
         <div class="sm:col-span-2">
           <label class="block text-xs font-semibold text-slate-700 mb-1">Election name</label>
-          <input v-model="electionForm.name" type="text" placeholder="e.g., 2025 HCAD Alumni Elections" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" />
+          <input v-model="electionForm.name" type="text" placeholder="e.g., 2025 HCAD Alumni Elections" class="w-full border border-emerald-200 rounded-lg px-3 py-2 text-sm bg-white/90" />
         </div>
         <div class="sm:col-span-2">
           <label class="block text-xs font-semibold text-slate-700 mb-1">Description (optional)</label>
-          <textarea v-model="electionForm.description" rows="2" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"></textarea>
+          <textarea v-model="electionForm.description" rows="2" class="w-full border border-emerald-200 rounded-lg px-3 py-2 text-sm bg-white/90"></textarea>
         </div>
         <div>
           <label class="block text-xs font-semibold text-slate-700 mb-1">Nomination start</label>
-          <input v-model="electionForm.nomination_start" type="datetime-local" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" />
+          <input v-model="electionForm.nomination_start" type="datetime-local" class="w-full border border-emerald-200 rounded-lg px-3 py-2 text-sm bg-white/90" />
         </div>
         <div>
           <label class="block text-xs font-semibold text-slate-700 mb-1">Nomination end</label>
-          <input v-model="electionForm.nomination_end" type="datetime-local" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" />
+          <input v-model="electionForm.nomination_end" type="datetime-local" class="w-full border border-emerald-200 rounded-lg px-3 py-2 text-sm bg-white/90" />
         </div>
         <div>
           <label class="block text-xs font-semibold text-slate-700 mb-1">Voting start</label>
-          <input v-model="electionForm.voting_start" type="datetime-local" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" />
+          <input v-model="electionForm.voting_start" type="datetime-local" class="w-full border border-emerald-200 rounded-lg px-3 py-2 text-sm bg-white/90" />
         </div>
         <div>
           <label class="block text-xs font-semibold text-slate-700 mb-1">Voting end</label>
-          <input v-model="electionForm.voting_end" type="datetime-local" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" />
+          <input v-model="electionForm.voting_end" type="datetime-local" class="w-full border border-emerald-200 rounded-lg px-3 py-2 text-sm bg-white/90" />
         </div>
         <div class="sm:col-span-2">
           <label class="block text-xs font-semibold text-slate-700 mb-1">Results announcement</label>
-          <input v-model="electionForm.results_at" type="datetime-local" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" />
+          <input v-model="electionForm.results_at" type="datetime-local" class="w-full border border-emerald-200 rounded-lg px-3 py-2 text-sm bg-white/90" />
         </div>
+        <label class="flex items-center gap-2 text-xs text-slate-700">
+          <input v-model="electionForm.auto_publish_results" type="checkbox" />
+          Auto-publish results at the scheduled time
+        </label>
         <label class="flex items-center gap-2 text-xs text-slate-700">
           <input v-model="electionForm.is_active" type="checkbox" />
           Set election as active
@@ -726,7 +824,7 @@ onMounted(async () => {
           <button
             @click="clearTimelineDates"
             type="button"
-            class="px-3 py-1.5 rounded-lg border border-slate-300 text-xs hover:bg-slate-100"
+            class="px-3 py-1.5 rounded-lg border border-emerald-200 text-xs hover:bg-emerald-50 bg-white shadow-sm"
           >
             Clear dates
           </button>
@@ -805,7 +903,7 @@ onMounted(async () => {
       </div>
     </div>
 
-    <div v-if="activeSection === 'nominations'" id="nominations" class="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 shadow-sm space-y-3">
+    <div v-if="activeSection === 'nominations'" id="nominations" class="bg-gradient-to-br from-emerald-50 via-white to-slate-50 rounded-2xl border border-emerald-100 p-4 sm:p-5 shadow-sm space-y-3">
       <div class="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
         <h3 class="text-sm font-semibold">Nominations</h3>
         <p class="text-[11px] text-slate-500">Promote to make official candidates.</p>
@@ -815,7 +913,7 @@ onMounted(async () => {
         <div
           v-for="nom in nominations"
           :key="nom.id"
-          class="border border-slate-100 rounded-xl p-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2"
+          class="border border-emerald-100 rounded-xl p-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 bg-white/90 shadow-sm"
         >
           <div>
             <p class="text-sm font-semibold">
@@ -839,7 +937,7 @@ onMounted(async () => {
       </div>
     </div>
 
-    <div v-if="activeSection === 'reminders'" id="reminders" class="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 shadow-sm space-y-2">
+    <div v-if="activeSection === 'reminders'" id="reminders" class="bg-gradient-to-br from-emerald-50 via-white to-slate-50 rounded-2xl border border-emerald-100 p-4 sm:p-5 shadow-sm space-y-2">
       <h3 class="text-sm font-semibold">Reminders</h3>
       <div v-if="!reminders.length" class="text-xs text-slate-500">No reminders stored.</div>
       <ul v-else class="text-sm text-slate-700 list-disc list-inside">
@@ -847,10 +945,16 @@ onMounted(async () => {
       </ul>
     </div>
 
-    <div v-if="activeSection === 'voters'" id="voters" class="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 shadow-sm space-y-3">
+    <div v-if="activeSection === 'voters'" id="voters" class="bg-gradient-to-br from-emerald-50 via-white to-slate-50 rounded-2xl border border-emerald-100 p-4 sm:p-5 shadow-sm space-y-3">
       <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <h3 class="text-sm font-semibold">Voters</h3>
         <div class="flex flex-wrap gap-2">
+          <input
+            v-model="voterSearch"
+            type="text"
+            placeholder="Search name, voter ID, or batch"
+            class="text-xs px-3 py-1.5 rounded-lg border border-emerald-200 bg-white/90 shadow-inner"
+          />
           <button @click="exportRecentVotersCsv" class="text-xs px-3 py-1.5 rounded-lg border border-slate-300 hover:bg-slate-100">Export recent CSV</button>
           <button @click="openAddVoter" class="text-xs px-3 py-1.5 rounded-lg bg-emerald-600 text-white shadow-sm">Add voter</button>
           <button
@@ -867,8 +971,10 @@ onMounted(async () => {
         Also reset PINs
       </label>
       <div v-if="loadingVoters" class="text-xs text-slate-500">Loading voters.</div>
-      <div v-else class="text-xs text-slate-600">Total: {{ voters.length }}</div>
-      <div v-if="recentVoters.length" class="border border-slate-100 rounded-xl p-3 bg-slate-50 text-[11px] space-y-2">
+      <div v-else class="text-xs text-slate-600">
+        Showing {{ filteredVoters.length }} of {{ voters.length }} voters
+      </div>
+      <div v-if="recentVoters.length" class="border border-emerald-100 rounded-xl p-3 bg-white/90 text-[11px] space-y-2 shadow-sm">
         <div class="flex items-center justify-between">
           <p class="font-semibold text-slate-800">Recent credentials (last 30 min)</p>
           <button @click="pruneRecentVoters" class="px-2 py-1 rounded border border-slate-300 hover:bg-slate-100 text-[10px]">Refresh</button>
@@ -881,10 +987,10 @@ onMounted(async () => {
           </div>
         </div>
       </div>
-      <div class="max-h-64 overflow-y-auto border border-slate-100 rounded-xl" v-if="voters.length">
+      <div class="max-h-64 overflow-y-auto border border-emerald-100 rounded-xl shadow-sm bg-white/95" v-if="filteredVoters.length">
         <div class="overflow-x-auto">
           <table class="w-full min-w-[600px] text-xs">
-            <thead class="bg-slate-50">
+            <thead class="bg-emerald-50/50">
               <tr class="text-left text-slate-500">
                 <th class="px-3 py-2">Name</th>
                 <th class="px-3 py-2">Voter ID</th>
@@ -894,7 +1000,7 @@ onMounted(async () => {
               </tr>
             </thead>
             <tbody>
-              <tr v-for="v in voters" :key="v.id" class="border-t border-slate-100">
+              <tr v-for="v in filteredVoters" :key="v.id" class="border-t border-slate-100">
                 <td class="px-3 py-2">{{ v.name }}</td>
                 <td class="px-3 py-2">{{ v.voter_id }}</td>
                 <td class="px-3 py-2">{{ v.batch_year || 'N/A' }}</td>
@@ -907,8 +1013,11 @@ onMounted(async () => {
           </table>
         </div>
       </div>
+      <p v-else class="text-xs text-slate-500">No voters match your search.</p>
       <p v-if="voterError" class="text-xs text-rose-600">{{ voterError }}</p>
     </div>
+    </div>
+  </div>
 
     <div v-if="addVoterModal" class="fixed inset-0 z-40 flex items-center justify-center bg-slate-900/40 px-3">
       <div class="bg-white rounded-2xl shadow-xl max-w-lg w-full p-6 space-y-3">
@@ -962,6 +1071,46 @@ onMounted(async () => {
             class="text-xs px-3 py-1.5 rounded-lg bg-emerald-600 text-white shadow-sm disabled:bg-slate-300"
           >
             {{ voterSubmitting ? 'Saving.' : 'Save voter' }}
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div
+      v-if="confirmDialog.open"
+      class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 px-3"
+      @click.self="handleConfirm(false)"
+    >
+      <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 space-y-4 border border-emerald-100">
+        <div class="flex items-start gap-3">
+          <div
+            class="h-10 w-10 rounded-full flex items-center justify-center text-lg font-semibold"
+            :class="confirmDialog.tone === 'danger' ? 'bg-rose-50 text-rose-700' : 'bg-emerald-50 text-emerald-700'"
+          >
+            !
+          </div>
+          <div class="space-y-1">
+            <p class="text-[11px] uppercase tracking-wide text-slate-500 font-semibold">
+              {{ confirmDialog.title || 'Please confirm' }}
+            </p>
+            <p class="text-sm text-slate-700 whitespace-pre-line">
+              {{ confirmDialog.message || 'Are you sure you want to continue?' }}
+            </p>
+          </div>
+        </div>
+        <div class="flex justify-end gap-2 pt-2">
+          <button
+            class="px-3 py-1.5 text-sm rounded-lg border border-slate-300 hover:bg-slate-50"
+            @click="handleConfirm(false)"
+          >
+            {{ confirmDialog.cancelText || 'Cancel' }}
+          </button>
+          <button
+            class="px-3 py-1.5 text-sm rounded-lg shadow-sm"
+            :class="confirmDialog.tone === 'danger' ? 'bg-rose-600 text-white hover:bg-rose-700' : 'bg-emerald-600 text-white hover:bg-emerald-700'"
+            @click="handleConfirm(true)"
+          >
+            {{ confirmDialog.confirmText || 'Confirm' }}
           </button>
         </div>
       </div>

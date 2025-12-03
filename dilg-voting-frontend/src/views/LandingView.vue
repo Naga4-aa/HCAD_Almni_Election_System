@@ -18,6 +18,11 @@ const formatDate = (value) => {
   }
 }
 
+const formatRange = (start, end) => {
+  if (!start || !end) return 'To be announced'
+  return `${formatDate(start)} → ${formatDate(end)}`
+}
+
 const loadElection = async () => {
   try {
     const res = await api.get('elections/current/')
@@ -74,7 +79,7 @@ onMounted(async () => {
       <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
         <h3 class="text-sm font-semibold text-slate-800">Nomination Period</h3>
         <p class="text-xs text-slate-500">
-          <span v-if="election">{{ formatDate(election.nomination_start) }} -> {{ formatDate(election.nomination_end) }}</span>
+          <span v-if="election">{{ formatRange(election.nomination_start, election.nomination_end) }}</span>
           <span v-else>To be announced</span>
         </p>
         <p class="text-xs text-slate-600 mt-2">Submit one nominee for any open position.</p>
@@ -82,7 +87,7 @@ onMounted(async () => {
       <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
         <h3 class="text-sm font-semibold text-slate-800">Voting Period</h3>
         <p class="text-xs text-slate-500">
-          <span v-if="election">{{ formatDate(election.voting_start) }} -> {{ formatDate(election.voting_end) }}</span>
+          <span v-if="election">{{ formatRange(election.voting_start, election.voting_end) }}</span>
           <span v-else>To be announced</span>
         </p>
         <p class="text-xs text-slate-600 mt-2">One ballot per voter. One vote per position.</p>
@@ -105,8 +110,16 @@ onMounted(async () => {
       <ol class="list-decimal list-inside space-y-2">
         <li>Request your Voter ID and PIN from the admin (President/COMELEC) for verification.</li>
         <li>Log in with your Voter ID + PIN. Confirm the consent checkbox.</li>
-        <li>During Dec 1-15: submit one nomination (with reason and contact details).</li>
-        <li>During Dec 16-20: select one candidate per position and submit your ballot once.</li>
+        <li>
+          During
+          <strong>{{ election ? formatRange(election.nomination_start, election.nomination_end) : 'the nomination window' }}</strong>:
+          submit one nomination (with reason and contact details).
+        </li>
+        <li>
+          During
+          <strong>{{ election ? formatRange(election.voting_start, election.voting_end) : 'the voting window' }}</strong>:
+          select one candidate per position and submit your ballot once.
+        </li>
       </ol>
       <p class="text-[11px] text-slate-500">Need help? Contact the HCAD Alumni office or your chapter lead.</p>
     </section>

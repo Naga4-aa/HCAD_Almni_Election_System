@@ -33,7 +33,7 @@ const voterLinks = computed(() => {
 <template>
   <div class="min-h-screen text-slate-800 app-shell">
     <header class="header-bar sticky top-0 z-20">
-      <div class="relative max-w-6xl mx-auto px-4 py-3 flex items-center justify-between gap-3">
+      <div class="relative max-w-screen-2xl mx-auto px-4 py-3 flex items-center justify-between gap-3">
         <div class="flex items-center gap-3">
           <img
             :src="Logo"
@@ -154,7 +154,7 @@ const voterLinks = computed(() => {
       </div>
     </header>
 
-    <main class="max-w-6xl mx-auto px-3 sm:px-4 py-6">
+    <main class="max-w-screen-2xl mx-auto px-3 sm:px-4 py-6">
       <RouterView />
     </main>
   </div>
