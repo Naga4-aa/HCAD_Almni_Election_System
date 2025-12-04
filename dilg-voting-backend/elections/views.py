@@ -387,6 +387,15 @@ def nominate(request):
         is_good_standing=data.get("is_good_standing", False),
     )
 
+    # Notify admins of incoming nomination (no voter attached so it stays in admin inbox)
+    Notification.objects.create(
+        type="nomination_submitted",
+        message=(
+            f"New nomination: {nomination.nominee_full_name} for {nomination.position.get_name_display()} "
+            f"by {voter.name} (batch {voter.batch_year})"
+        ),
+    )
+
     return Response(NominationSerializer(nomination).data, status=201)
 
 
