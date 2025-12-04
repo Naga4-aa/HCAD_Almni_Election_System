@@ -620,9 +620,9 @@ onUnmounted(() => {
         </div>
       </div>
 
-      <div v-else class="text-sm text-slate-600 bg-slate-50 border border-slate-200 rounded-xl p-3">
-        Nomination window not open. Please check the posted schedule.
+        <div v-else-if="!showNominationForm && !myNomination" class="text-sm text-slate-600 bg-slate-50 border border-slate-200 rounded-xl p-3">
+          Nomination window not open. Please check the posted schedule.
+        </div>
       </div>
     </div>
-  </div>
-</template>
+  </template>
