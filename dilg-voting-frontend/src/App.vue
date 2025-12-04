@@ -192,6 +192,36 @@ const markVoterNotificationsHeaderRead = async () => {
   }
 }
 
+const deleteVoterNotificationHeader = async (id) => {
+  if (!authStore.isAuthenticated) return
+  try {
+    await api.post('notifications/', { action: 'delete', ids: [id] })
+    await loadVoterNotificationsHeader()
+  } catch (err) {
+    voterNotifError.value = err.response?.data?.error || 'Failed to delete notification.'
+  }
+}
+
+const markVoterNotificationHeaderRead = async (id) => {
+  if (!authStore.isAuthenticated) return
+  try {
+    await api.post('notifications/', { action: 'mark_read', ids: [id] })
+    await loadVoterNotificationsHeader()
+  } catch (err) {
+    voterNotifError.value = err.response?.data?.error || 'Failed to mark as read.'
+  }
+}
+
+const deleteAllVoterNotificationsHeader = async () => {
+  if (!authStore.isAuthenticated) return
+  try {
+    await api.post('notifications/', { action: 'delete_all' })
+    await loadVoterNotificationsHeader()
+  } catch (err) {
+    voterNotifError.value = err.response?.data?.error || 'Failed to delete all notifications.'
+  }
+}
+
 const toggleVoterNotifications = async () => {
   if (!voterNotifOpen.value && authStore.isAuthenticated) {
     voterNotifOpen.value = true
@@ -399,8 +429,8 @@ watch(
               </button>
               <div
                 v-if="voterNotifOpen"
-                class="absolute right-0 mt-2 rounded-2xl border border-slate-200 bg-white/95 shadow-2xl backdrop-blur p-3 z-30"
-                :class="voterNotifOpen ? 'w-80 max-w-xs sm:max-w-sm' : ''"
+                class="absolute right-0 mt-2 rounded-2xl border border-slate-200 bg-white/95 shadow-2xl backdrop-blur p-4 z-30"
+                :class="voterNotifOpen ? 'w-96 max-w-md' : ''"
               >
                 <div class="flex items-start justify-between gap-2">
                   <div>
@@ -430,15 +460,40 @@ watch(
                       <p class="text-slate-700">{{ n.message }}</p>
                       <p class="text-[10px] text-slate-500">{{ new Date(n.created_at).toLocaleString() }}</p>
                     </div>
+                    <div class="flex flex-col items-end gap-1">
+                      <button
+                        class="text-[10px] px-2 py-1 rounded border border-emerald-200 text-emerald-700 hover:bg-emerald-50"
+                        @click="markVoterNotificationHeaderRead(n.id)"
+                        :disabled="voterNotifLoading || n.is_read"
+                      >
+                        {{ n.is_read ? 'Read' : 'Mark read' }}
+                      </button>
+                      <button
+                        class="text-[10px] px-2 py-1 rounded border border-rose-200 text-rose-700 hover:bg-rose-50"
+                        @click="deleteVoterNotificationHeader(n.id)"
+                        :disabled="voterNotifLoading"
+                      >
+                        Delete
+                      </button>
+                    </div>
                   </li>
                 </ul>
-                <button
-                  class="mt-2 inline-flex items-center justify-center w-full text-[11px] px-3 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-100"
-                  @click="markVoterNotificationsHeaderRead"
-                  :disabled="voterNotifLoading || voterNotifUnread === 0"
-                >
-                  Mark all read
-                </button>
+                <div class="mt-2 grid grid-cols-2 gap-2">
+                  <button
+                    class="inline-flex items-center justify-center w-full text-[11px] px-3 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-100"
+                    @click="markVoterNotificationsHeaderRead"
+                    :disabled="voterNotifLoading || voterNotifUnread === 0"
+                  >
+                    Mark all read
+                  </button>
+                  <button
+                    class="inline-flex items-center justify-center w-full text-[11px] px-3 py-1.5 rounded-lg border border-rose-200 text-rose-700 hover:bg-rose-50"
+                    @click="deleteAllVoterNotificationsHeader"
+                    :disabled="voterNotifLoading || !voterNotifItems.length"
+                  >
+                    Delete all
+                  </button>
+                </div>
               </div>
             </div>
             <RouterLink

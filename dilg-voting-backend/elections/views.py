@@ -774,6 +774,9 @@ def voter_notifications(request):
   if action == "mark_all_read":
       base_qs.filter(is_read=False).update(is_read=True)
       return Response({"message": "Marked all as read"})
+  if action == "mark_read":
+      base_qs.filter(id__in=ids).update(is_read=True)
+      return Response({"message": "Marked as read"})
   if action == "dismiss":
       base_qs.filter(id__in=ids).update(is_hidden=True, is_read=True)
       return Response({"message": "Dismissed"})
