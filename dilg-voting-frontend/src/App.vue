@@ -17,6 +17,12 @@ const headerNotifLoading = ref(false)
 const headerNotifError = ref('')
 const headerNotifExpanded = ref(false)
 const headerNotifTimer = ref(null)
+const voterNotifOpen = ref(false)
+const voterNotifItems = ref([])
+const voterNotifUnread = ref(0)
+const voterNotifLoading = ref(false)
+const voterNotifError = ref('')
+const voterNotifTimer = ref(null)
 
 authStore.initFromStorage()
 adminAuth.initFromStorage()
@@ -159,6 +165,60 @@ onUnmounted(() => {
   stopHeaderPolling()
   window.removeEventListener('visibilitychange', handleVisibility)
 })
+
+// Voter notification helpers
+const loadVoterNotificationsHeader = async () => {
+  if (!authStore.isAuthenticated) return
+  voterNotifLoading.value = true
+  try {
+    const res = await api.get('notifications/')
+    voterNotifItems.value = res.data?.items?.slice(0, 8) || []
+    voterNotifUnread.value = res.data?.unread_count || 0
+    voterNotifError.value = ''
+  } catch (err) {
+    voterNotifError.value = err.response?.data?.error || 'Failed to load notifications.'
+  } finally {
+    voterNotifLoading.value = false
+  }
+}
+
+const markVoterNotificationsHeaderRead = async () => {
+  if (!authStore.isAuthenticated) return
+  try {
+    await api.post('notifications/', { action: 'mark_all_read' })
+    await loadVoterNotificationsHeader()
+  } catch (err) {
+    voterNotifError.value = err.response?.data?.error || 'Failed to mark as read.'
+  }
+}
+
+const toggleVoterNotifications = async () => {
+  if (!voterNotifOpen.value && authStore.isAuthenticated) {
+    voterNotifOpen.value = true
+    await loadVoterNotificationsHeader()
+  } else {
+    voterNotifOpen.value = false
+  }
+}
+
+const startVoterHeaderPolling = () => {
+  if (voterNotifTimer.value) clearInterval(voterNotifTimer.value)
+  if (!authStore.isAuthenticated) return
+  voterNotifTimer.value = setInterval(loadVoterNotificationsHeader, 15000)
+}
+
+watch(
+  () => authStore.isAuthenticated,
+  (isAuthed) => {
+    if (isAuthed) {
+      loadVoterNotificationsHeader()
+      startVoterHeaderPolling()
+    } else {
+      if (voterNotifTimer.value) clearInterval(voterNotifTimer.value)
+    }
+  },
+  { immediate: true },
+)
 </script>
 
 <template>
@@ -318,6 +378,68 @@ onUnmounted(() => {
             <div v-if="authStore.isAuthenticated" class="hidden sm:block text-right">
               <p class="font-semibold">{{ authStore.voter?.name }}</p>
               <p>Voter ID: {{ authStore.voter?.voter_id }}</p>
+            </div>
+            <div v-if="authStore.isAuthenticated" class="relative">
+              <button
+                class="relative h-10 w-10 rounded-full border bg-white shadow-sm flex items-center justify-center transition outline-none focus:outline-none ring-0 ring-[rgba(196,151,60,0.55)] hover:bg-[rgba(196,151,60,0.12)]"
+                :class="voterNotifOpen ? 'bg-[rgba(196,151,60,0.18)] ring-2 border-[var(--hcad-gold)] shadow-[0_0_0_3px_rgba(196,151,60,0.15)]' : 'border-slate-200'"
+                @click="toggleVoterNotifications"
+                aria-label="Notifications"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-slate-700" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                  <path d="M15 17h5l-1.4-1.4A2 2 0 0 1 18 14.2V11a6 6 0 1 0-12 0v3.2c0 .5-.2 1-.6 1.4L4 17h5" stroke-linecap="round" stroke-linejoin="round" />
+                  <path d="M9 17a3 3 0 0 0 6 0" stroke-linecap="round" stroke-linejoin="round" />
+                </svg>
+                <span
+                  v-if="voterNotifUnread"
+                  class="absolute -top-1 -right-1 min-w-[18px] h-5 px-1 rounded-full bg-rose-500 text-white text-[10px] font-semibold flex items-center justify-center"
+                >
+                  {{ voterNotifUnread > 9 ? '9+' : voterNotifUnread }}
+                </span>
+              </button>
+              <div
+                v-if="voterNotifOpen"
+                class="absolute right-0 mt-2 rounded-2xl border border-slate-200 bg-white/95 shadow-2xl backdrop-blur p-3 z-30"
+                :class="voterNotifOpen ? 'w-80 max-w-xs sm:max-w-sm' : ''"
+              >
+                <div class="flex items-start justify-between gap-2">
+                  <div>
+                    <p class="text-sm font-semibold text-slate-800">Notifications</p>
+                    <p class="text-[11px] text-slate-500">
+                      <span :class="voterNotifUnread ? 'text-rose-600 font-semibold' : ''">{{ voterNotifUnread }} unread</span>
+                    </p>
+                  </div>
+                  <button
+                    class="text-[11px] px-2 py-1 rounded-lg border border-slate-200 hover:bg-slate-100"
+                    @click="loadVoterNotificationsHeader"
+                    :disabled="voterNotifLoading"
+                  >
+                    Refresh
+                  </button>
+                </div>
+                <p v-if="voterNotifError" class="text-[11px] text-rose-600 mt-2">{{ voterNotifError }}</p>
+                <p v-else-if="voterNotifLoading" class="text-[11px] text-slate-500 mt-2">Loading...</p>
+                <p v-else-if="!voterNotifItems.length" class="text-[11px] text-slate-500 mt-2">No notifications yet.</p>
+                <ul
+                  v-else
+                  class="mt-2 divide-y divide-slate-200 text-[11px] text-slate-700 max-h-64 overflow-y-auto"
+                >
+                  <li v-for="n in voterNotifItems" :key="n.id" class="py-2 flex items-start gap-2">
+                    <span class="mt-0.5 h-2 w-2 rounded-full" :class="n.is_read ? 'bg-slate-300' : 'bg-emerald-500'"></span>
+                    <div class="flex-1">
+                      <p class="text-slate-700">{{ n.message }}</p>
+                      <p class="text-[10px] text-slate-500">{{ new Date(n.created_at).toLocaleString() }}</p>
+                    </div>
+                  </li>
+                </ul>
+                <button
+                  class="mt-2 inline-flex items-center justify-center w-full text-[11px] px-3 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-100"
+                  @click="markVoterNotificationsHeaderRead"
+                  :disabled="voterNotifLoading || voterNotifUnread === 0"
+                >
+                  Mark all read
+                </button>
+              </div>
             </div>
             <RouterLink
               v-if="!authStore.isAuthenticated"

@@ -352,8 +352,25 @@ def nominate(request):
     except Position.DoesNotExist:
         return Response({"error": "Invalid position"}, status=404)
 
-    # enforce one nomination per voter per election
-    if Nomination.objects.filter(election=election, nominator=voter).exists():
+    existing = Nomination.objects.filter(election=election, nominator=voter).first()
+    if existing:
+        if existing.status == "rejected":
+            # Allow resubmission: update the existing record, reset status to pending
+            existing.position = position
+            existing.nominee_full_name = data["nominee_full_name"].strip()
+            existing.nominee_batch_year = data["nominee_batch_year"]
+            existing.nominee_campus_chapter = data.get("nominee_campus_chapter", "")
+            existing.contact_email = data.get("contact_email", "")
+            existing.contact_phone = data.get("contact_phone", "")
+            existing.reason = data.get("reason", "")
+            existing.nominee_photo = data.get("nominee_photo")
+            existing.is_good_standing = data.get("is_good_standing", False)
+            existing.status = "pending"
+            existing.rejection_reason = ""
+            existing.promoted = False
+            existing.promoted_at = None
+            existing.save()
+            return Response(NominationSerializer(existing).data, status=200)
         return Response({"error": "You already submitted a nomination"}, status=400)
 
     nomination = Nomination.objects.create(
@@ -669,12 +686,100 @@ def admin_promote_nomination(request, nomination_id):
         )
         nomination.promoted = True
         nomination.promoted_at = timezone.now()
-        nomination.save(update_fields=["promoted", "promoted_at"])
+        nomination.status = "promoted"
+        nomination.rejection_reason = ""
+        nomination.save(update_fields=["promoted", "promoted_at", "status", "rejection_reason"])
+        Notification.objects.create(
+            type="nomination_promoted",
+            message=f"Your nomination for {nomination.nominee_full_name} ({nomination.position.get_name_display()}) was promoted.",
+            voter=nomination.nominator,
+        )
 
     return Response({
         "candidate": CandidateSerializer(candidate).data,
         "created": created,
     })
+
+
+@api_view(["POST"])
+def admin_reject_nomination(request, nomination_id):
+    admin = get_admin_from_request(request)
+    if not admin:
+        return Response({"error": "Admin authentication required"}, status=403)
+
+    reason = (request.data.get("reason") or "").strip()
+    if not reason:
+        return Response({"error": "Rejection reason is required"}, status=400)
+
+    try:
+        nomination = Nomination.objects.select_related("position").get(id=nomination_id)
+    except Nomination.DoesNotExist:
+        return Response({"error": "Nomination not found"}, status=404)
+
+    nomination.status = "rejected"
+    nomination.rejection_reason = reason
+    nomination.promoted = False
+    nomination.promoted_at = None
+    nomination.save(update_fields=["status", "rejection_reason", "promoted", "promoted_at"])
+
+    # Notify via admin notifications feed so admins can track decisions
+    Notification.objects.create(
+        type="nomination_rejected",
+        message=f"Nomination for {nomination.nominee_full_name} ({nomination.position.get_name_display()}) was rejected: {reason}",
+    )
+    # Notify the voter
+    Notification.objects.create(
+        type="nomination_rejected",
+        message=f"Your nomination for {nomination.nominee_full_name} ({nomination.position.get_name_display()}) was rejected: {reason}",
+        voter=nomination.nominator,
+    )
+
+    return Response(NominationSerializer(nomination).data)
+
+
+@api_view(["GET", "POST"])
+def voter_notifications(request):
+  """
+  Voter-facing notifications for nomination decisions and other events.
+  Supports:
+  - GET: list unread/visible notifications (can include read when ?history=1)
+  - POST: mark_all_read, dismiss, delete
+  """
+  voter = get_authenticated_voter(request)
+  if not voter:
+      return Response({"error": "Authentication required"}, status=401)
+
+  if request.method == "GET":
+      show_history = request.query_params.get("history") in ["1", "true", "yes"]
+      qs = Notification.objects.filter(voter=voter)
+      if not show_history:
+          qs = qs.filter(is_hidden=False)
+      qs = qs.order_by("-created_at", "-id")[:100]
+      unread_count = Notification.objects.filter(voter=voter, is_read=False, is_hidden=False).count()
+      return Response(
+          {
+              "items": NotificationSerializer(qs, many=True).data,
+              "unread_count": unread_count,
+          }
+      )
+
+  action = (request.data.get("action") or "").strip()
+  ids = request.data.get("ids") or []
+  base_qs = Notification.objects.filter(voter=voter)
+  if action == "mark_all_read":
+      base_qs.filter(is_read=False).update(is_read=True)
+      return Response({"message": "Marked all as read"})
+  if action == "dismiss":
+      base_qs.filter(id__in=ids).update(is_hidden=True, is_read=True)
+      return Response({"message": "Dismissed"})
+  if action == "delete":
+      base_qs.filter(id__in=ids).delete()
+      return Response({"message": "Deleted"})
+  if action == "delete_all":
+      base_qs.delete()
+      return Response({"message": "All notifications deleted"})
+
+  return Response({"error": "Invalid action"}, status=400)
 
 
 @api_view(["GET", "POST"])

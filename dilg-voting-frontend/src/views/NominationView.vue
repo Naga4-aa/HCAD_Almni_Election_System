@@ -41,6 +41,10 @@ const activeCandidates = computed(() => {
   return candidatesByPosition.value[pid] || []
 })
 const lastSignature = ref(null)
+const voterNotifications = ref([])
+const voterUnread = ref(0)
+const voterNotifLoading = ref(false)
+let voterNotifTimer = null
 
 const isDemoMode = computed(() => election.value?.mode === 'demo')
 const isNominationOpen = computed(() => {
@@ -61,6 +65,11 @@ const hasTimeline = computed(() => {
   })
 })
 const showNominationForm = computed(() => hasActiveElection.value && hasTimeline.value && isNominationOpen.value)
+const canSubmitNomination = computed(() => {
+  if (!showNominationForm.value) return false
+  if (!myNomination.value) return true
+  return myNomination.value.status === 'rejected'
+})
 
 const nominationTiming = computed(() => {
   if (isDemoMode.value) {
@@ -174,6 +183,33 @@ const loadCandidates = async () => {
   }
 }
 
+const loadVoterNotifications = async () => {
+  voterNotifLoading.value = true
+  try {
+    const res = await api.get('notifications/')
+    voterNotifications.value = res.data?.items || []
+    voterUnread.value = res.data?.unread_count || 0
+  } catch (err) {
+    // ignore
+  } finally {
+    voterNotifLoading.value = false
+  }
+}
+
+const markVoterNotificationsRead = async () => {
+  try {
+    await api.post('notifications/', { action: 'mark_all_read' })
+    await loadVoterNotifications()
+  } catch (err) {
+    // ignore
+  }
+}
+
+const startVoterNotifPolling = () => {
+  if (voterNotifTimer) clearInterval(voterNotifTimer)
+  voterNotifTimer = setInterval(loadVoterNotifications, 15000)
+}
+
 const loadMyNomination = async () => {
   try {
     const res = await api.get('my-nomination/')
@@ -222,7 +258,20 @@ const submitNomination = async () => {
       headers: { 'Content-Type': 'multipart/form-data' },
     })
     myNomination.value = res.data
-    statusMessage.value = 'Nomination submitted successfully.'
+    statusMessage.value = 'Nomination submitted for review.'
+    // Clear form and lock until decision
+    form.value = {
+      position_id: null,
+      nominee_full_name: '',
+      nominee_batch_year: '',
+      nominee_campus_chapter: '',
+      contact_email: '',
+      contact_phone: '',
+      reason: '',
+      nominee_photo: null,
+      is_good_standing: false,
+      consent: false,
+    }
   } catch (err) {
     console.error(err)
     errorMessage.value = err.response?.data?.error || 'Failed to submit nomination.'
@@ -279,8 +328,12 @@ const refreshElectionData = async () => {
       lastElectionId.value = currentId
       lastSignature.value = signature
       await loadPositions()
-      await loadMyNomination()
       await loadCandidates()
+      await loadMyNomination()
+    }
+    // Always refresh nomination status so banner/form reflect latest decisions
+    if (!changed) {
+      await loadMyNomination()
     }
   } catch (err) {
     // ignore transient poll errors
@@ -308,11 +361,14 @@ onMounted(async () => {
     now.value = Date.now()
   }, 15000)
   refreshTimerId = setInterval(refreshElectionData, 10000)
+  loadVoterNotifications()
+  startVoterNotifPolling()
 })
 
 onUnmounted(() => {
   if (timerId) clearInterval(timerId)
   if (refreshTimerId) clearInterval(refreshTimerId)
+  if (voterNotifTimer) clearInterval(voterNotifTimer)
 })
 </script>
 
@@ -353,6 +409,29 @@ onUnmounted(() => {
           >
             {{ candidatesLoading ? 'Refreshing...' : 'Refresh list' }}
           </button>
+        </div>
+        <div class="bg-amber-50 border border-amber-200 rounded-xl p-3 space-y-1 text-[11px] text-slate-700" v-if="voterNotifications.length">
+          <div class="flex items-center justify-between">
+            <p class="font-semibold text-slate-800">Updates</p>
+            <button
+              class="text-[11px] px-2 py-1 rounded-lg border border-slate-300 hover:bg-slate-100"
+              @click="markVoterNotificationsRead"
+              :disabled="voterNotifLoading || voterUnread === 0"
+            >
+              Mark read
+            </button>
+          </div>
+          <div class="max-h-32 overflow-y-auto space-y-2">
+            <div
+              v-for="n in voterNotifications"
+              :key="n.id"
+              class="rounded-lg border border-slate-200 bg-white/80 px-3 py-2"
+              :class="n.is_read ? 'opacity-70' : ''"
+            >
+              <p class="text-[11px] text-slate-800">{{ n.message }}</p>
+              <p class="text-[10px] text-slate-500">{{ new Date(n.created_at).toLocaleString() }}</p>
+            </div>
+          </div>
         </div>
         <p v-if="candidatesError" class="text-xs text-rose-600">{{ candidatesError }}</p>
         <p v-else-if="candidatesLoading" class="text-xs text-slate-600">Loading candidate list...</p>
@@ -400,12 +479,23 @@ onUnmounted(() => {
         </div>
       </div>
 
-      <p v-if="myNomination" class="text-sm text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-xl p-3">
-        You already nominated <span class="font-semibold">{{ myNomination.nominee_full_name }}</span>
-        for {{ myNomination.position_name }}. Thank you!
+      <p v-if="myNomination" class="text-sm bg-emerald-50 border border-emerald-100 rounded-xl p-3" :class="myNomination.status === 'rejected' ? 'text-amber-700' : 'text-emerald-700'">
+        <span v-if="myNomination.status === 'promoted'">
+          Your nomination of <span class="font-semibold">{{ myNomination.nominee_full_name }}</span> for {{ myNomination.position_name }} was promoted. Thank you!
+        </span>
+        <span v-else-if="myNomination.status === 'pending'">
+          Your nomination of <span class="font-semibold">{{ myNomination.nominee_full_name }}</span> for {{ myNomination.position_name }} is pending admin review.
+        </span>
+        <span v-else-if="myNomination.status === 'rejected'">
+          Your nomination was rejected. Reason: <span class="font-semibold">{{ myNomination.rejection_reason || 'Not provided' }}</span>.
+          You may submit a new nomination now.
+        </span>
+        <span v-else>
+          You already nominated <span class="font-semibold">{{ myNomination.nominee_full_name }}</span> for {{ myNomination.position_name }}.
+        </span>
       </p>
 
-      <div v-else-if="!hasActiveElection" class="text-sm text-slate-600 bg-slate-50 border border-slate-200 rounded-xl p-3">
+      <div v-if="!hasActiveElection" class="text-sm text-slate-600 bg-slate-50 border border-slate-200 rounded-xl p-3">
         No active election. Please wait for the admin to reopen nominations.
       </div>
 
@@ -413,14 +503,14 @@ onUnmounted(() => {
         Timeline not set. Waiting for admin to provide dates.
       </div>
 
-      <div v-else-if="showNominationForm" class="grid gap-3 md:grid-cols-2 border border-slate-200 rounded-2xl p-3 sm:p-4 bg-white/90">
+      <div v-else-if="showNominationForm && canSubmitNomination" class="grid gap-3 md:grid-cols-2 border border-slate-200 rounded-2xl p-3 sm:p-4 bg-white/90">
         <div class="space-y-3">
           <div>
             <label class="text-xs font-semibold text-slate-700">Position</label>
             <select
               v-model="form.position_id"
               class="mt-1 w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"
-              :disabled="!isNominationOpen"
+              :disabled="!isNominationOpen || !canSubmitNomination"
             >
               <option value="">-- Select position --</option>
               <option v-for="p in positions" :key="p.id" :value="p.id">{{ p.name_display || p.name }}</option>
@@ -434,7 +524,7 @@ onUnmounted(() => {
               type="text"
               class="mt-1 w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"
               placeholder="e.g. Juan Dela Cruz"
-              :disabled="!isNominationOpen"
+              :disabled="!isNominationOpen || !canSubmitNomination"
             />
           </div>
 
@@ -442,47 +532,47 @@ onUnmounted(() => {
             <div>
               <label class="text-xs font-semibold text-slate-700">Batch / Year</label>
               <input
-                v-model="form.nominee_batch_year"
-                type="number"
-                class="mt-1 w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"
-                placeholder="1998"
-                :disabled="!isNominationOpen"
-              />
-            </div>
-            <div>
-              <label class="text-xs font-semibold text-slate-700">Campus / Chapter</label>
-              <input
-                v-model="form.nominee_campus_chapter"
-                type="text"
-                class="mt-1 w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"
-                placeholder="Main Campus / Digos / etc"
-                :disabled="!isNominationOpen"
-              />
-            </div>
+              v-model="form.nominee_batch_year"
+              type="number"
+              class="mt-1 w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"
+              placeholder="1998"
+              :disabled="!isNominationOpen || !canSubmitNomination"
+            />
           </div>
+          <div>
+            <label class="text-xs font-semibold text-slate-700">Campus / Chapter</label>
+            <input
+              v-model="form.nominee_campus_chapter"
+              type="text"
+              class="mt-1 w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"
+              placeholder="Main Campus / Digos / etc"
+              :disabled="!isNominationOpen || !canSubmitNomination"
+            />
+          </div>
+        </div>
 
           <div class="grid gap-3 sm:grid-cols-2">
             <div>
               <label class="text-xs font-semibold text-slate-700">Contact Email (optional)</label>
               <input
-                v-model="form.contact_email"
-                type="email"
-                class="mt-1 w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"
-                placeholder="name@email.com"
-                :disabled="!isNominationOpen"
-              />
-            </div>
-            <div>
-              <label class="text-xs font-semibold text-slate-700">Contact Phone (optional)</label>
-              <input
-                v-model="form.contact_phone"
-                type="text"
-                class="mt-1 w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"
-                placeholder="09xxxxxxxxx"
-                :disabled="!isNominationOpen"
-              />
-            </div>
+              v-model="form.contact_email"
+              type="email"
+              class="mt-1 w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"
+              placeholder="name@email.com"
+              :disabled="!isNominationOpen || !canSubmitNomination"
+            />
           </div>
+          <div>
+            <label class="text-xs font-semibold text-slate-700">Contact Phone (optional)</label>
+            <input
+              v-model="form.contact_phone"
+              type="text"
+              class="mt-1 w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"
+              placeholder="09xxxxxxxxx"
+              :disabled="!isNominationOpen || !canSubmitNomination"
+            />
+          </div>
+        </div>
 
           <div>
             <label class="text-xs font-semibold text-slate-700">Reason for nomination</label>
@@ -491,7 +581,7 @@ onUnmounted(() => {
               rows="4"
               class="mt-1 w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"
               placeholder="Why are you nominating this alumnus/a?"
-              :disabled="!isNominationOpen"
+              :disabled="!isNominationOpen || !canSubmitNomination"
             ></textarea>
           </div>
 
@@ -504,7 +594,7 @@ onUnmounted(() => {
         <div class="space-y-3">
           <div>
             <label class="text-xs font-semibold text-slate-700">Nominee photo (optional)</label>
-            <input type="file" accept="image/*" @change="handleFile" :disabled="!isNominationOpen" />
+            <input type="file" accept="image/*" @change="handleFile" :disabled="!isNominationOpen || !canSubmitNomination" />
           </div>
 
           <div class="rounded-xl bg-slate-50 border border-slate-200 p-3 text-xs text-slate-600">
@@ -518,7 +608,7 @@ onUnmounted(() => {
           <div class="flex flex-wrap gap-2">
             <button
               @click="submitNomination"
-              :disabled="submitting || !isNominationOpen"
+              :disabled="submitting || !isNominationOpen || !canSubmitNomination"
               class="px-4 py-2 rounded-lg bg-emerald-600 text-white text-sm shadow-sm disabled:bg-slate-300"
             >
               {{ submitting ? 'Submitting.' : 'Submit Nomination' }}

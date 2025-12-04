@@ -30,6 +30,7 @@ urlpatterns = [
     path("admin/stats/", views.admin_stats),
     path("admin/nominations/", views.admin_nominations),
     path("admin/nominations/<int:nomination_id>/promote/", views.admin_promote_nomination),
+    path("admin/nominations/<int:nomination_id>/reject/", views.admin_reject_nomination),
     path("admin/reminders/", views.admin_reminders),
     path("admin/election/active/", views.admin_active_election),
     path("admin/election/publish/", views.admin_publish_results),
@@ -37,4 +38,7 @@ urlpatterns = [
     path("admin/notifications/", views.admin_notifications),
     path("admin/reset-voters/", views.admin_reset_voters),
     path("admin/reset-election/", views.admin_reset_election),
+
+    # Voter notifications
+    path("notifications/", views.voter_notifications),
 ]

@@ -177,6 +177,8 @@ class NominationSerializer(serializers.ModelSerializer):
             "reason",
             "nominee_photo",
             "is_good_standing",
+            "status",
+            "rejection_reason",
             "promoted",
             "promoted_at",
             "created_at",

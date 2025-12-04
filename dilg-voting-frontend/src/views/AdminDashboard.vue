@@ -177,6 +177,17 @@ const loadNominations = async () => {
   nominations.value = res.data || []
 }
 
+const rejectNomination = async (nom) => {
+  const reason = window.prompt(`Reject ${nom.nominee_full_name}? Enter reason:`, '')
+  if (!reason) return
+  try {
+    await api.post(`admin/nominations/${nom.id}/reject/`, { reason })
+    await loadNominations()
+  } catch (err) {
+    alert(err.response?.data?.error || 'Failed to reject nomination.')
+  }
+}
+
 const loadReminders = async () => {
   try {
     const res = await api.get('admin/reminders/')
@@ -917,16 +928,29 @@ onUnmounted(() => {
             <p class="text-[11px] text-slate-500">
               Batch {{ nom.nominee_batch_year }} - {{ nom.nominee_campus_chapter || 'Campus/Chapter not set' }}
             </p>
+            <p class="text-[11px]" :class="nom.status === 'rejected' ? 'text-rose-600' : 'text-slate-500'">
+              Status: {{ nom.status || 'pending' }}
+              <span v-if="nom.status === 'rejected' && nom.rejection_reason">({{ nom.rejection_reason }})</span>
+            </p>
             <p v-if="nom.promoted_at" class="text-[11px] text-slate-500">Promoted at: {{ nom.promoted_at }}</p>
           </div>
-          <button
-            v-if="!nom.promoted"
-            @click="promote(nom)"
-            :disabled="promotingId === nom.id"
-            class="text-xs px-3 py-1.5 rounded-lg bg-emerald-600 text-white shadow-sm disabled:bg-slate-300"
-          >
-            {{ promotingId === nom.id ? 'Promoting.' : 'Promote to Candidate' }}
-          </button>
+          <div class="flex flex-wrap gap-2">
+            <button
+              v-if="!nom.promoted && nom.status !== 'rejected'"
+              @click="promote(nom)"
+              :disabled="promotingId === nom.id"
+              class="text-xs px-3 py-1.5 rounded-lg bg-emerald-600 text-white shadow-sm disabled:bg-slate-300"
+            >
+              {{ promotingId === nom.id ? 'Promoting.' : 'Promote to Candidate' }}
+            </button>
+            <button
+              v-if="!nom.promoted && nom.status !== 'rejected'"
+              @click="rejectNomination(nom)"
+              class="text-xs px-3 py-1.5 rounded-lg border border-rose-300 text-rose-700 bg-rose-50 hover:bg-rose-100"
+            >
+              Reject
+            </button>
+          </div>
         </div>
       </div>
     </div>

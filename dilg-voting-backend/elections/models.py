@@ -167,6 +167,11 @@ class Voter(models.Model):
 
 
 class Nomination(models.Model):
+    STATUS_CHOICES = (
+        ("pending", "Pending"),
+        ("promoted", "Promoted"),
+        ("rejected", "Rejected"),
+    )
     election = models.ForeignKey(
         Election,
         on_delete=models.CASCADE,
@@ -190,6 +195,8 @@ class Nomination(models.Model):
     reason = models.TextField(blank=True)
     nominee_photo = models.ImageField(upload_to="nominations/", blank=True, null=True)
     is_good_standing = models.BooleanField(default=False)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="pending")
+    rejection_reason = models.TextField(blank=True)
     promoted = models.BooleanField(default=False)
     promoted_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -283,6 +290,7 @@ class Notification(models.Model):
     is_read = models.BooleanField(default=False)
     # Legacy column name in MySQL is "dismissed"; map it here to avoid migration mismatch.
     is_hidden = models.BooleanField(default=False, db_column="dismissed")
+    voter = models.ForeignKey("Voter", on_delete=models.CASCADE, null=True, blank=True, related_name="notifications")
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
