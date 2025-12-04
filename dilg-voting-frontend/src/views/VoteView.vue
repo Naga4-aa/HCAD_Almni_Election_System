@@ -194,13 +194,10 @@ const restoreDraft = () => {
   if (!raw) return
   try {
     const parsed = JSON.parse(raw)
-    const restored = {}
-    positions.value.forEach((pos) => {
-      const candidateId = Number(parsed.selections?.[pos.id])
-      const valid = (candidatesByPosition.value[pos.id] || []).some((c) => Number(c.id) === candidateId)
-      if (valid) restored[pos.id] = candidateId
-    })
-    selections.value = restored
+    const restoredSelections = Object.fromEntries(
+      Object.entries(parsed.selections || {}).map(([pid, cid]) => [Number(pid), Number(cid)]),
+    )
+    selections.value = restoredSelections
     consent.value = !!parsed.consent
     draftRestored.value = true
   } catch (_) {
