@@ -1,6 +1,6 @@
 ﻿<!-- src/views/VoteView.vue -->
 <script setup>
-import { ref, onMounted, onUnmounted, computed } from 'vue'
+import { ref, onMounted, onUnmounted, computed, watch } from 'vue'
 import api from '../api'
 import { useAuthStore } from '../stores/auth'
 import { countdownTo, formatDateTime, toMs } from '../utils/time'
