@@ -29,6 +29,10 @@ const tallyTab = ref(null)
 const activeTally = computed(() => {
   return tally.value?.find((p) => p.position_id === tallyTab.value) || null
 })
+const publishedResultsTab = ref(null)
+const activePublishedPosition = computed(() => {
+  return publishedResults.value?.positions?.find((p) => p.position_id === publishedResultsTab.value) || null
+})
 const electionForm = ref({
   name: '',
   description: '',
@@ -156,6 +160,19 @@ watch(
     }
     const stillExists = list.some((p) => p.position_id === tallyTab.value)
     tallyTab.value = stillExists ? tallyTab.value : list[0]?.position_id
+  },
+  { immediate: true },
+)
+
+watch(
+  () => publishedResults.value?.positions,
+  (list) => {
+    if (!list?.length) {
+      publishedResultsTab.value = null
+      return
+    }
+    const exists = list.some((p) => p.position_id === publishedResultsTab.value)
+    publishedResultsTab.value = exists ? publishedResultsTab.value : list[0]?.position_id
   },
   { immediate: true },
 )
@@ -730,35 +747,49 @@ onUnmounted(() => {
           >
             Refresh
           </button>
-        </div>
-        <div v-if="loadingPublishedResults" class="text-sm text-slate-500">Loading published results...</div>
-        <div v-else-if="publishedResults" class="grid gap-3 md:grid-cols-2">
-          <div
-            v-for="pos in publishedResults.positions || []"
-            :key="pos.position_id"
-            class="border border-emerald-100 rounded-xl p-3 space-y-2 bg-white/90 shadow-sm"
-          >
-            <div class="flex items-center justify-between">
-              <p class="text-sm font-semibold">{{ pos.position }}</p>
-              <span class="text-[11px] text-slate-500">{{ pos.candidates?.length || 0 }} candidate(s)</span>
+          </div>
+          <div v-if="loadingPublishedResults" class="text-sm text-slate-500">Loading published results...</div>
+          <div v-else-if="publishedResults" class="space-y-3">
+            <div class="flex flex-wrap gap-2">
+              <button
+                v-for="pos in publishedResults.positions || []"
+                :key="pos.position_id"
+                class="px-3 py-1.5 rounded-full border text-xs transition"
+                :class="
+                  publishedResultsTab === pos.position_id
+                    ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm'
+                    : 'border-slate-300 bg-white hover:bg-emerald-50 text-slate-700'
+                "
+                @click="publishedResultsTab = pos.position_id"
+              >
+                {{ pos.position }}
+              </button>
             </div>
-            <div class="space-y-2">
-              <div v-for="cand in pos.candidates" :key="cand.id" class="flex justify-between text-sm">
-                <div>
-                  <p class="font-semibold" :class="{ 'text-emerald-700': cand.winner }">{{ cand.full_name }}</p>
-                  <p class="text-[11px] text-slate-500">Batch {{ cand.batch_year }} - {{ cand.campus_chapter || 'Campus/Chapter not set' }}</p>
-                </div>
-                <div class="text-right">
-                  <p class="font-semibold text-slate-800">{{ cand.votes }} vote(s)</p>
-                  <p v-if="cand.winner" class="text-[11px] text-emerald-700 font-semibold">Winner</p>
+            <div v-if="activePublishedPosition" class="border border-emerald-100 rounded-xl p-3 space-y-2 bg-white/90 shadow-sm">
+              <div class="flex items-center justify-between">
+                <p class="text-sm font-semibold">{{ activePublishedPosition.position }}</p>
+                <span class="text-[11px] text-slate-500">{{ activePublishedPosition.candidates?.length || 0 }} candidate(s)</span>
+              </div>
+              <div class="space-y-2">
+                <div v-for="cand in activePublishedPosition.candidates" :key="cand.id" class="flex justify-between text-sm">
+                  <div>
+                    <p class="font-semibold" :class="{ 'text-emerald-700': cand.winner }">{{ cand.full_name }}</p>
+                    <p class="text-[11px] text-slate-500">
+                      Batch {{ cand.batch_year }} - {{ cand.campus_chapter || 'Campus/Chapter not set' }}
+                    </p>
+                  </div>
+                  <div class="text-right">
+                    <p class="font-semibold text-slate-800">{{ cand.votes }} vote(s)</p>
+                    <p v-if="cand.winner" class="text-[11px] text-emerald-700 font-semibold">Winner</p>
+                  </div>
                 </div>
               </div>
             </div>
+            <p v-else class="text-sm text-slate-600">No positions to display.</p>
           </div>
+          <div v-else class="text-sm text-slate-600">No published results yet.</div>
         </div>
-        <div v-else class="text-sm text-slate-600">No published results yet.</div>
       </div>
-    </div>
 
     <div v-if="activeSection === 'timeline'" id="timeline" class="bg-gradient-to-br from-emerald-50 via-white to-slate-50 rounded-2xl border border-emerald-100 p-4 sm:p-5 shadow-sm space-y-3">
       <div class="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
