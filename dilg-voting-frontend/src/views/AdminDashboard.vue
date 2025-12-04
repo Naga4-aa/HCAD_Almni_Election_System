@@ -29,6 +29,7 @@ const tallyTab = ref(null)
 const nominationsTimer = ref(null)
 const nominationsSeen = ref(new Set())
 const hasNewNominations = ref(false)
+const lastNewNominations = ref([])
 const activeTally = computed(() => {
   return tally.value?.find((p) => p.position_id === tallyTab.value) || null
 })
@@ -138,9 +139,15 @@ watch(
   (val) => {
     if (val === 'nominations' && hasNewNominations.value) {
       hasNewNominations.value = false
+      lastNewNominations.value = []
     }
   },
 )
+
+const clearNewNominations = () => {
+  hasNewNominations.value = false
+  lastNewNominations.value = []
+}
 
 const toInput = (val) => {
   if (!val) return ''
@@ -205,14 +212,27 @@ const loadNominations = async () => {
   const res = await api.get('admin/nominations/')
   const incoming = res.data || []
   const incomingIds = new Set(incoming.map((n) => n.id))
-  const unseen = [...incomingIds].some((id) => !nominationsSeen.value.has(id))
+  const newOnes = incoming.filter((n) => !nominationsSeen.value.has(n.id))
+  const unseen = newOnes.length > 0
   nominations.value = incoming
   if (unseen) {
     hasNewNominations.value = true
+    lastNewNominations.value = newOnes.map((n) => `${n.nominee_full_name} (${n.position_name})`)
+    // Surface a lightweight notification so admins notice new nominations
+    newOnes.forEach((n) => {
+      notifications.value.unshift({
+        id: `local-nom-${n.id}-${Date.now()}`,
+        message: `New nomination: ${n.nominee_full_name} (${n.position_name})`,
+        created_at: new Date().toISOString(),
+        read: false,
+      })
+      unreadNotifications.value += 1
+    })
   }
   nominationsSeen.value = incomingIds
   if (activeSection.value === 'nominations') {
     hasNewNominations.value = false
+    lastNewNominations.value = []
   }
 }
 
@@ -685,23 +705,23 @@ onUnmounted(() => {
           <p class="text-xs text-slate-500">Live turnout, tallies, and nominations.</p>
         </div>
         <div class="text-[11px] uppercase tracking-wide text-slate-500 font-semibold px-1">Navigation</div>
-          <div class="flex lg:flex-col gap-2 overflow-x-auto lg:overflow-visible px-1">
-            <button
-              v-for="s in sections"
-              :key="s.key"
-              @click="activeSection = s.key"
-              class="text-sm w-full text-left px-3 py-2 rounded-xl border transition flex items-center gap-2 whitespace-nowrap"
-              :class="activeSection === s.key ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm' : 'border-slate-200 text-slate-700 hover:bg-emerald-50'"
+        <div class="flex lg:flex-col gap-2 overflow-x-auto lg:overflow-visible px-1">
+          <button
+            v-for="s in sections"
+            :key="s.key"
+            @click="activeSection = s.key"
+            class="text-sm w-full text-left px-3 py-2 rounded-xl border transition flex items-center gap-2 whitespace-nowrap"
+            :class="activeSection === s.key ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm' : 'border-slate-200 text-slate-700 hover:bg-emerald-50'"
+          >
+            <span>{{ s.label }}</span>
+            <span
+              v-if="s.key === 'nominations' && hasNewNominations"
+              class="ml-1 inline-flex items-center justify-center text-[10px] px-2 py-0.5 rounded-full bg-rose-100 text-rose-700 border border-rose-200"
             >
-              <span>{{ s.label }}</span>
-              <span
-                v-if="s.key === 'nominations' && hasNewNominations"
-                class="ml-1 inline-flex items-center justify-center text-[10px] px-2 py-0.5 rounded-full bg-rose-100 text-rose-700 border border-rose-200"
-              >
-                New
-              </span>
-            </button>
-          </div>
+              New
+            </span>
+          </button>
+        </div>
         <div class="flex-1"></div>
         <div class="flex flex-col gap-2 pt-2">
           <button @click="resetElection" :disabled="resettingElection" class="text-sm px-3 py-2 rounded-lg border border-rose-400 text-rose-700 bg-rose-50 hover:bg-rose-100 disabled:opacity-60">
@@ -713,7 +733,25 @@ onUnmounted(() => {
         </div>
       </aside>
 
-      <div class="flex-1 space-y-6 min-w-0 w-full">
+    <div class="flex-1 space-y-6 min-w-0 w-full">
+      <div
+        v-if="hasNewNominations && lastNewNominations.length"
+        class="sticky top-2 z-20 flex flex-col gap-2 bg-emerald-50 border border-emerald-100 text-emerald-800 rounded-xl px-4 py-3 shadow-sm"
+      >
+        <div class="flex items-center justify-between gap-3">
+          <p class="text-sm font-semibold">New nomination{{ lastNewNominations.length > 1 ? 's' : '' }} received</p>
+          <button
+            class="text-[11px] px-2 py-1 rounded border border-emerald-200 bg-white hover:bg-emerald-50"
+            @click="clearNewNominations"
+          >
+            Dismiss
+          </button>
+        </div>
+        <ul class="text-xs text-emerald-900 list-disc list-inside">
+          <li v-for="item in lastNewNominations" :key="item">{{ item }}</li>
+        </ul>
+        <p class="text-[11px] text-emerald-700">Tap “Nominations” to review and promote.</p>
+      </div>
         <div v-if="loading" class="text-sm text-slate-500">Loading dashboard.</div>
         <p v-if="errorMessage" class="text-sm text-rose-600">{{ errorMessage }}</p>
 
