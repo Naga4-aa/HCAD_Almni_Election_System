@@ -1,6 +1,6 @@
 ﻿<!-- src/views/ResultsView.vue -->
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import api from '../api'
 import { countdownTo, formatDateTime, toMs } from '../utils/time'
 
@@ -32,6 +32,24 @@ const resultsEta = computed(() => {
   if (!hasTimeline.value || !election.value?.results_at) return null
   return formatDateTime(election.value.results_at)
 })
+
+const activePositionId = ref(null)
+const activePosition = computed(() => {
+  return results.value?.positions?.find((p) => p.position_id === activePositionId.value) || null
+})
+
+watch(
+  () => results.value?.positions,
+  (list) => {
+    if (!list || list.length === 0) {
+      activePositionId.value = null
+      return
+    }
+    const exists = list.some((p) => p.position_id === activePositionId.value)
+    activePositionId.value = exists ? activePositionId.value : list[0].position_id
+  },
+  { immediate: true },
+)
 
 const loadResults = async () => {
   loading.value = true
@@ -115,26 +133,43 @@ onUnmounted(() => {
     <div v-if="error" class="text-sm text-rose-600">{{ error }}</div>
     <div v-else-if="loading" class="text-sm text-slate-600">Loading...</div>
 
-    <div v-else-if="results" class="grid gap-4 md:grid-cols-2">
+    <div v-else-if="results" class="space-y-4">
+      <div class="flex flex-wrap gap-2">
+        <button
+          v-for="pos in results.positions || []"
+          :key="pos.position_id"
+          class="px-3 py-1.5 rounded-full border text-xs transition"
+          :class="
+            activePositionId === pos.position_id
+              ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm'
+              : 'border-slate-300 bg-white hover:bg-emerald-50 text-slate-700'
+          "
+          @click="activePositionId = pos.position_id"
+        >
+          {{ pos.position }}
+        </button>
+      </div>
+
       <div
-        v-for="pos in results.positions || []"
-        :key="pos.position_id"
+        v-if="activePosition"
         class="bg-white/90 rounded-2xl border border-slate-200 p-4 sm:p-5 shadow-sm space-y-3"
       >
         <div class="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-          <h3 class="text-sm font-semibold text-slate-800">{{ pos.position }}</h3>
-          <span class="text-[11px] text-slate-500">{{ pos.candidates?.length || 0 }} candidate(s)</span>
+          <h3 class="text-sm font-semibold text-slate-800">{{ activePosition.position }}</h3>
+          <span class="text-[11px] text-slate-500">{{ activePosition.candidates?.length || 0 }} candidate(s)</span>
         </div>
         <ul class="space-y-3 text-sm text-slate-700">
           <li
-            v-for="cand in pos.candidates"
+            v-for="cand in activePosition.candidates"
             :key="cand.id"
             class="space-y-1"
           >
             <div class="flex items-center justify-between">
               <div>
                 <p class="font-semibold" :class="{ 'text-emerald-700': cand.winner }">{{ cand.full_name }}</p>
-                <p class="text-[11px] text-slate-500">Batch {{ cand.batch_year }} - {{ cand.campus_chapter || 'Campus/Chapter not set' }}</p>
+                <p class="text-[11px] text-slate-500">
+                  Batch {{ cand.batch_year }} - {{ cand.campus_chapter || 'Campus/Chapter not set' }}
+                </p>
               </div>
               <div class="text-right">
                 <p class="text-sm font-semibold text-slate-800">{{ cand.votes }} vote(s)</p>
@@ -144,12 +179,19 @@ onUnmounted(() => {
             <div class="h-2.5 rounded-full bg-slate-100 overflow-hidden">
               <div
                 class="h-full rounded-full bg-gradient-to-r from-[var(--hcad-gold)] to-[var(--hcad-navy)] transition-all duration-300"
-                :style="{ width: (Math.max(...pos.candidates.map(c => c.votes), 1) ? (cand.votes / Math.max(...pos.candidates.map(c => c.votes), 1)) * 100 : 0) + '%' }"
+                :style="{
+                  width:
+                    (Math.max(...activePosition.candidates.map((c) => c.votes), 1)
+                      ? (cand.votes / Math.max(...activePosition.candidates.map((c) => c.votes), 1)) * 100
+                      : 0) + '%',
+                }"
               ></div>
             </div>
           </li>
         </ul>
       </div>
+
+      <p v-else class="text-sm text-slate-600">No positions to display.</p>
     </div>
 
     <div v-else class="text-sm text-slate-600">Results not yet published.</div>
