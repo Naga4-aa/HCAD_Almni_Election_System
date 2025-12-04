@@ -1,6 +1,5 @@
 # elections/views.py
 from datetime import datetime
-import random
 
 from django.contrib.auth import authenticate, get_user_model
 from django.core import signing
@@ -256,10 +255,7 @@ def candidates_list(request):
     if position_id:
         qs = qs.filter(position_id=position_id)
     qs = qs.order_by("position__display_order", "full_name")
-    # shuffle per request for ballot rendering (simple random sample)
-    candidates = list(qs)
-    random.shuffle(candidates)
-    return Response(CandidateSerializer(candidates, many=True).data)
+    return Response(CandidateSerializer(qs, many=True).data)
 
 
 @api_view(["GET"])
