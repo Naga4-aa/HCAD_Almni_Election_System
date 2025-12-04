@@ -54,29 +54,12 @@ const notificationsLoading = ref(false)
 const notificationsError = ref('')
 const notificationsCollapsed = ref(false)
 const showHistory = ref(false)
-const recentVoters = ref([])
 const voterSearch = ref('')
-
-const pruneRecentVoters = () => {
-  const cutoff = Date.now() - 30 * 60 * 1000 // 30 minutes
-  recentVoters.value = recentVoters.value.filter((v) => v.createdAt >= cutoff)
-}
 
 // Voters
 const voters = ref([])
 const loadingVoters = ref(false)
-const addVoterModal = ref(false)
-const voterSubmitting = ref(false)
 const voterError = ref('')
-const newVoter = ref({
-  name: '',
-  batch_year: '',
-  campus_chapter: 'Digos City',
-  email: '',
-  phone: '',
-  privacy_consent: true,
-  pin: '',
-})
 const resettingVoters = ref(false)
 const resetPins = ref(false)
 const resettingElection = ref(false)
@@ -314,45 +297,10 @@ const resetVoterPin = async (voter) => {
   try {
     const res = await api.post(`admin/voters/${voter.id}/reset-pin/`)
     alert(`PIN reset.\nVoter ID: ${res.data.voter_id}\nPIN: ${res.data.pin}`)
-    pruneRecentVoters()
-    recentVoters.value.unshift({
-      id: voter.id,
-      name: voter.name,
-      voter_id: res.data.voter_id,
-      pin: res.data.pin,
-      createdAt: Date.now(),
-      source: 'Reset',
-    })
     await loadVoters()
   } catch (err) {
     alert(err.response?.data?.error || 'Failed to reset PIN.')
   }
-}
-
-const exportRecentVotersCsv = () => {
-  pruneRecentVoters()
-  if (!recentVoters.value.length) {
-    alert('No recent credentials to export (last 30 minutes).')
-    return
-  }
-  const header = ['Name', 'Voter ID', 'PIN', 'Source', 'Generated At']
-  const rows = recentVoters.value.map((v) => [
-    v.name,
-    v.voter_id,
-    v.pin,
-    v.source || 'New',
-    new Date(v.createdAt).toLocaleString(),
-  ])
-  const csv = [header, ...rows]
-    .map((r) => r.map((f) => `"${String(f).replace(/"/g, '""')}"`).join(','))
-    .join('\n')
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
-  const url = URL.createObjectURL(blob)
-  const link = document.createElement('a')
-  link.href = url
-  link.download = `voters_credentials_${Date.now()}.csv`
-  link.click()
-  URL.revokeObjectURL(url)
 }
 
 const clearTimelineDates = () => {
@@ -574,52 +522,6 @@ const filteredVoters = computed(() => {
   })
 })
 
-const openAddVoter = () => {
-  newVoter.value = {
-    name: '',
-    batch_year: '',
-    campus_chapter: 'Digos City',
-    email: '',
-    phone: '',
-    privacy_consent: true,
-    pin: '',
-  }
-  voterError.value = ''
-  addVoterModal.value = true
-}
-
-const submitVoter = async () => {
-  voterSubmitting.value = true
-  voterError.value = ''
-  try {
-    const res = await api.post('admin/voters/', {
-      name: newVoter.value.name,
-      batch_year: newVoter.value.batch_year,
-      campus_chapter: newVoter.value.campus_chapter,
-      email: newVoter.value.email,
-      phone: newVoter.value.phone,
-      privacy_consent: newVoter.value.privacy_consent,
-      pin: newVoter.value.pin,
-    })
-    await loadVoters()
-    addVoterModal.value = false
-    alert(`Voter created.\nVoter ID: ${res.data.voter_id}\nPIN: ${res.data.pin || newVoter.value.pin || 'N/A'}`)
-    pruneRecentVoters()
-    recentVoters.value.unshift({
-      id: res.data.id || Date.now(),
-      name: newVoter.value.name,
-      voter_id: res.data.voter_id,
-      pin: res.data.pin || newVoter.value.pin || 'N/A',
-      createdAt: Date.now(),
-      source: 'New',
-    })
-  } catch (err) {
-    voterError.value = err.response?.data?.error || 'Failed to create voter.'
-  } finally {
-    voterSubmitting.value = false
-  }
-}
-
 const resetAllVoters = async () => {
   const confirmReset = await askConfirm({
     title: 'Reset voters',
@@ -651,7 +553,6 @@ onMounted(async () => {
   }
   loading.value = true
   try {
-    pruneRecentVoters()
     await Promise.all([
       loadStats(),
       loadTally(),
@@ -1078,8 +979,6 @@ onUnmounted(() => {
             placeholder="Search name, voter ID, or batch"
             class="text-xs px-3 py-1.5 rounded-lg border border-emerald-200 bg-white/90 shadow-inner"
           />
-          <button @click="exportRecentVotersCsv" class="text-xs px-3 py-1.5 rounded-lg border border-slate-300 hover:bg-slate-100">Export recent CSV</button>
-          <button @click="openAddVoter" class="text-xs px-3 py-1.5 rounded-lg bg-emerald-600 text-white shadow-sm">Add voter</button>
           <button
             @click="resetAllVoters"
             :disabled="resettingVoters"
@@ -1096,19 +995,6 @@ onUnmounted(() => {
       <div v-if="loadingVoters" class="text-xs text-slate-500">Loading voters.</div>
       <div v-else class="text-xs text-slate-600">
         Showing {{ filteredVoters.length }} of {{ voters.length }} voters
-      </div>
-      <div v-if="recentVoters.length" class="border border-emerald-100 rounded-xl p-3 bg-white/90 text-[11px] space-y-2 shadow-sm">
-        <div class="flex items-center justify-between">
-          <p class="font-semibold text-slate-800">Recent credentials (last 30 min)</p>
-          <button @click="pruneRecentVoters" class="px-2 py-1 rounded border border-slate-300 hover:bg-slate-100 text-[10px]">Refresh</button>
-        </div>
-        <div class="max-h-40 overflow-y-auto divide-y divide-slate-200">
-          <div v-for="rv in recentVoters" :key="rv.voter_id + rv.pin" class="py-2">
-            <p class="font-semibold text-slate-800">{{ rv.name }} <span class="text-slate-500">({{ rv.voter_id }})</span></p>
-            <p class="text-slate-700">PIN: {{ rv.pin }}</p>
-            <p class="text-slate-500 text-[10px]">{{ rv.source }} · {{ new Date(rv.createdAt).toLocaleString() }}</p>
-          </div>
-        </div>
       </div>
       <div class="max-h-64 overflow-y-auto border border-emerald-100 rounded-xl shadow-sm bg-white/95" v-if="filteredVoters.length">
         <div class="overflow-x-auto">
@@ -1141,63 +1027,6 @@ onUnmounted(() => {
     </div>
     </div>
   </div>
-
-    <div v-if="addVoterModal" class="fixed inset-0 z-40 flex items-center justify-center bg-slate-900/40 px-3">
-      <div class="bg-white rounded-2xl shadow-xl max-w-lg w-full p-6 space-y-3">
-        <div class="flex items-center justify-between">
-          <h3 class="text-sm font-semibold">Add voter</h3>
-          <button class="text-xs" @click="addVoterModal = false">?</button>
-        </div>
-        <div class="grid gap-3 sm:grid-cols-2">
-          <div class="sm:col-span-2">
-            <label class="text-[11px] font-semibold text-slate-700">Full name</label>
-            <input v-model="newVoter.name" type="text" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" />
-          </div>
-          <div>
-            <label class="text-[11px] font-semibold text-slate-700">Batch year</label>
-            <input v-model="newVoter.batch_year" type="number" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" />
-          </div>
-          <div>
-            <label class="text-[11px] font-semibold text-slate-700">Campus/Chapter</label>
-            <input
-              v-model="newVoter.campus_chapter"
-              type="text"
-              readonly
-              class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm bg-slate-50 text-slate-600"
-            />
-            <p class="text-[10px] text-slate-500">Fixed to Digos City for this alumni chapter.</p>
-          </div>
-          <div>
-            <label class="text-[11px] font-semibold text-slate-700">Email</label>
-            <input v-model="newVoter.email" type="email" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" />
-          </div>
-          <div>
-            <label class="text-[11px] font-semibold text-slate-700">Phone</label>
-            <input v-model="newVoter.phone" type="text" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" />
-          </div>
-          <div>
-            <label class="text-[11px] font-semibold text-slate-700">PIN (optional)</label>
-            <input v-model="newVoter.pin" type="text" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" />
-            <p class="text-[10px] text-slate-500">Leave blank to auto-generate.</p>
-          </div>
-          <label class="flex items-center gap-2 text-[11px] text-slate-700 sm:col-span-2">
-            <input type="checkbox" v-model="newVoter.privacy_consent" />
-            Mark privacy consent as granted
-          </label>
-        </div>
-        <p v-if="voterError" class="text-xs text-rose-600">{{ voterError }}</p>
-        <div class="flex justify-end gap-2 pt-2">
-          <button class="text-xs px-3 py-1.5 rounded-lg border border-slate-300" @click="addVoterModal = false">Cancel</button>
-          <button
-            @click="submitVoter"
-            :disabled="voterSubmitting"
-            class="text-xs px-3 py-1.5 rounded-lg bg-emerald-600 text-white shadow-sm disabled:bg-slate-300"
-          >
-            {{ voterSubmitting ? 'Saving.' : 'Save voter' }}
-          </button>
-        </div>
-      </div>
-    </div>
 
     <div
       v-if="confirmDialog.open"
@@ -1240,3 +1069,4 @@ onUnmounted(() => {
     </div>
   </div>
 </template>
+

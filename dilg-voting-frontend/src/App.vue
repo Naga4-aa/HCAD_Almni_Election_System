@@ -613,4 +613,20 @@ button {
 .border {
   border-color: rgba(15, 35, 66, 0.08);
 }
+
+/* Consistent hover affordance for all buttons/rounded links */
+button,
+a[class*='rounded'] {
+  transition: transform 150ms ease, box-shadow 150ms ease, background-color 150ms ease, border-color 150ms ease, color 150ms ease;
+}
+button:hover,
+a[class*='rounded']:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.12);
+}
+button:active,
+a[class*='rounded']:active {
+  transform: translateY(-0.5px);
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.12);
+}
 </style>

@@ -58,18 +58,17 @@ onMounted(async () => {
       <p class="text-xs uppercase tracking-wide text-emerald-100">HCAD Alumni Association, Inc.</p>
       <h1 class="text-2xl sm:text-3xl font-semibold mt-2">HCAD Alumni Election System</h1>
       <p class="mt-3 max-w-3xl text-sm sm:text-base text-emerald-50">
-        Nominate and vote for the "HCADAA FYs 2025-2027 Officers". Secure, simple, and designed
-        for alumni across all chapters.
+        Nominate and vote for the HCADAA FYs 2025-2027 Officers.
       </p>
       <div class="mt-6 flex flex-wrap gap-3 text-sm">
         <RouterLink
           to="/login"
-          class="px-4 py-2 rounded-lg bg-white text-emerald-700 font-semibold shadow-sm hover:bg-emerald-50"
+          class="px-4 py-2 rounded-lg bg-white text-emerald-700 font-semibold shadow-sm transition-all duration-150 hover:bg-emerald-50 hover:shadow-[0_6px_14px_rgba(0,0,0,0.15)] hover:-translate-y-[1px]"
           >Voter Login</RouterLink
         >
         <RouterLink
           to="/info"
-          class="px-4 py-2 rounded-lg border border-emerald-200/70 bg-emerald-50/30 text-white hover:bg-emerald-50/40"
+          class="px-4 py-2 rounded-lg border border-emerald-200/70 bg-emerald-50/30 text-white transition-all duration-150 shadow-[0_2px_10px_rgba(0,0,0,0.08)] hover:bg-white/20 hover:border-white/70 hover:shadow-[0_6px_14px_rgba(0,0,0,0.15)] hover:text-white"
           >Registration Instructions</RouterLink
         >
       </div>
