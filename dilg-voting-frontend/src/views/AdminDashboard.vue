@@ -26,6 +26,9 @@ const loadingPublishedResults = ref(false)
 const demoMessage = ref('')
 const demoError = ref('')
 const tallyTab = ref(null)
+const nominationsTimer = ref(null)
+const nominationsSeen = ref(new Set())
+const hasNewNominations = ref(false)
 const activeTally = computed(() => {
   return tally.value?.find((p) => p.position_id === tallyTab.value) || null
 })
@@ -130,6 +133,15 @@ watch(
   { immediate: true },
 )
 
+watch(
+  () => activeSection.value,
+  (val) => {
+    if (val === 'nominations' && hasNewNominations.value) {
+      hasNewNominations.value = false
+    }
+  },
+)
+
 const toInput = (val) => {
   if (!val) return ''
   return String(val).slice(0, 16)
@@ -191,7 +203,17 @@ const loadPublishedResults = async () => {
 
 const loadNominations = async () => {
   const res = await api.get('admin/nominations/')
-  nominations.value = res.data || []
+  const incoming = res.data || []
+  const incomingIds = new Set(incoming.map((n) => n.id))
+  const unseen = [...incomingIds].some((id) => !nominationsSeen.value.has(id))
+  nominations.value = incoming
+  if (unseen) {
+    hasNewNominations.value = true
+  }
+  nominationsSeen.value = incomingIds
+  if (activeSection.value === 'nominations') {
+    hasNewNominations.value = false
+  }
 }
 
 const rejectNomination = async (nom) => {
@@ -640,10 +662,16 @@ onMounted(async () => {
     loadTally()
     loadStats()
   }, 10000)
+
+  // Auto-refresh nominations so new submissions appear without manual refresh
+  nominationsTimer.value = setInterval(() => {
+    loadNominations()
+  }, 10000)
 })
 
 onUnmounted(() => {
   if (tallyTimer) clearInterval(tallyTimer)
+  if (nominationsTimer.value) clearInterval(nominationsTimer.value)
 })
 </script>
 
@@ -657,17 +685,23 @@ onUnmounted(() => {
           <p class="text-xs text-slate-500">Live turnout, tallies, and nominations.</p>
         </div>
         <div class="text-[11px] uppercase tracking-wide text-slate-500 font-semibold px-1">Navigation</div>
-        <div class="flex lg:flex-col gap-2 overflow-x-auto lg:overflow-visible px-1">
-          <button
-            v-for="s in sections"
-            :key="s.key"
-            @click="activeSection = s.key"
-            class="text-sm w-full text-left px-3 py-2 rounded-xl border transition flex items-center gap-2 whitespace-nowrap"
-            :class="activeSection === s.key ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm' : 'border-slate-200 text-slate-700 hover:bg-emerald-50'"
-          >
-            {{ s.label }}
-          </button>
-        </div>
+          <div class="flex lg:flex-col gap-2 overflow-x-auto lg:overflow-visible px-1">
+            <button
+              v-for="s in sections"
+              :key="s.key"
+              @click="activeSection = s.key"
+              class="text-sm w-full text-left px-3 py-2 rounded-xl border transition flex items-center gap-2 whitespace-nowrap"
+              :class="activeSection === s.key ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm' : 'border-slate-200 text-slate-700 hover:bg-emerald-50'"
+            >
+              <span>{{ s.label }}</span>
+              <span
+                v-if="s.key === 'nominations' && hasNewNominations"
+                class="ml-1 inline-flex items-center justify-center text-[10px] px-2 py-0.5 rounded-full bg-rose-100 text-rose-700 border border-rose-200"
+              >
+                New
+              </span>
+            </button>
+          </div>
         <div class="flex-1"></div>
         <div class="flex flex-col gap-2 pt-2">
           <button @click="resetElection" :disabled="resettingElection" class="text-sm px-3 py-2 rounded-lg border border-rose-400 text-rose-700 bg-rose-50 hover:bg-rose-100 disabled:opacity-60">
@@ -943,6 +977,18 @@ onUnmounted(() => {
       <div class="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
         <h3 class="text-sm font-semibold">Nominations</h3>
         <p class="text-[11px] text-slate-500">Promote to make official candidates.</p>
+      </div>
+      <div
+        v-if="hasNewNominations"
+        class="text-xs text-emerald-800 bg-emerald-50 border border-emerald-100 rounded-lg px-3 py-2 flex items-center justify-between"
+      >
+        <span>New nominations received. List updates automatically.</span>
+        <button
+          class="text-[11px] px-2 py-1 rounded border border-emerald-200 bg-white hover:bg-emerald-50"
+          @click="hasNewNominations = false"
+        >
+          Dismiss
+        </button>
       </div>
       <div v-if="nominations.length === 0" class="text-xs text-slate-500">No nominations yet.</div>
       <div v-else class="space-y-3">
