@@ -19,6 +19,7 @@ const errorMessage = ref('')
 const consent = ref(false)
 const now = ref(Date.now())
 const lastElectionId = ref(null)
+const draftRestored = ref(false)
 
 const isDemoMode = computed(() => election.value?.mode === 'demo')
 const phase = computed(() => {
@@ -147,6 +148,8 @@ const clearBallot = () => {
   candidatesByPosition.value = {}
   selections.value = {}
   hasVoted.value = false
+  consent.value = false
+  draftRestored.value = false
 }
 
 const loadMyVotes = async () => {
@@ -163,6 +166,49 @@ const loadMyVotes = async () => {
   } catch (err) {
     hasVoted.value = false
   }
+}
+
+const draftKey = () => {
+  if (!authStore.voter || !election.value?.id) return null
+  return `ballotDraft:${authStore.voter.voter_id}:${election.value.id}`
+}
+
+const saveDraft = () => {
+  if (hasVoted.value) return
+  const key = draftKey()
+  if (!key) return
+  const payload = {
+    selections: selections.value,
+    consent: consent.value,
+  }
+  localStorage.setItem(key, JSON.stringify(payload))
+}
+
+const restoreDraft = () => {
+  if (draftRestored.value) return
+  const key = draftKey()
+  if (!key) return
+  const raw = localStorage.getItem(key)
+  if (!raw) return
+  try {
+    const parsed = JSON.parse(raw)
+    const restored = {}
+    positions.value.forEach((pos) => {
+      const candidateId = parsed.selections?.[pos.id]
+      const valid = (candidatesByPosition.value[pos.id] || []).some((c) => c.id === candidateId)
+      if (valid) restored[pos.id] = candidateId
+    })
+    selections.value = restored
+    consent.value = !!parsed.consent
+    draftRestored.value = true
+  } catch (_) {
+    // ignore malformed draft
+  }
+}
+
+const clearDraft = () => {
+  const key = draftKey()
+  if (key) localStorage.removeItem(key)
 }
 
 const submitBallot = async () => {
@@ -185,6 +231,7 @@ const submitBallot = async () => {
     await api.post('ballot/submit/', { votes: selections.value })
     statusMessage.value = 'Ballot submitted. Thank you for voting!'
     hasVoted.value = true
+    clearDraft()
   } catch (err) {
     console.error(err)
     errorMessage.value = err.response?.data?.error || 'Failed to submit ballot.'
@@ -215,6 +262,7 @@ const tick = async () => {
       await loadPositions()
       await loadAllCandidates()
       await loadMyVotes()
+      restoreDraft()
     }
   } catch (e) {
     // ignore transient errors on poll
@@ -233,6 +281,7 @@ onMounted(async () => {
       await loadPositions()
       await loadAllCandidates()
       await loadMyVotes()
+      restoreDraft()
     }
   } finally {
     loading.value = false
@@ -243,6 +292,17 @@ onMounted(async () => {
 onUnmounted(() => {
   if (timerId) clearInterval(timerId)
 })
+
+watch(
+  () => selections.value,
+  () => saveDraft(),
+  { deep: true },
+)
+
+watch(
+  () => consent.value,
+  () => saveDraft(),
+)
 </script>
 
 <template>
