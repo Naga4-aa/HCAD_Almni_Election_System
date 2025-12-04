@@ -564,7 +564,7 @@ watch(
       </div>
     </header>
 
-    <main class="max-w-screen-2xl mx-auto px-3 sm:px-4 py-6">
+    <main :class="isAdminContext ? 'max-w-full mx-0 px-2 sm:px-3 lg:px-4 py-6' : 'max-w-screen-2xl mx-auto px-3 sm:px-4 py-6'">
       <RouterView />
     </main>
   </div>

@@ -587,9 +587,9 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="space-y-6 w-full max-w-screen-2xl mx-auto px-3 sm:px-4 lg:px-6">
-    <div class="flex flex-col lg:grid lg:grid-cols-[320px_minmax(0,1fr)] gap-4 lg:gap-6 w-full">
-      <aside class="w-full lg:w-auto lg:sticky lg:top-16 bg-white/95 border border-emerald-100 rounded-2xl shadow-sm p-4 space-y-4 lg:min-h-[calc(100vh-140px)] overflow-auto flex flex-col">
+  <div class="space-y-6 w-full max-w-full mx-0 px-0 sm:px-2 lg:px-3">
+    <div class="flex flex-col lg:grid lg:grid-cols-[360px_minmax(0,1fr)] gap-4 lg:gap-6 w-full">
+      <aside class="w-full lg:w-auto lg:sticky lg:top-16 bg-white/95 border border-emerald-100 rounded-2xl shadow-sm p-4 space-y-4 lg:min-h-[calc(100vh-140px)] overflow-auto flex flex-col lg:min-w-[360px]">
         <div class="space-y-1">
           <p class="text-[11px] uppercase tracking-wide text-emerald-600 font-semibold">Admin</p>
           <h2 class="text-lg font-semibold leading-tight">COMELEC Dashboard</h2>
