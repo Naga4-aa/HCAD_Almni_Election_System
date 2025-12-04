@@ -1183,11 +1183,13 @@ def admin_notifications(request):
 
     if request.method == "GET":
         show_history = request.query_params.get("history") in ["1", "true", "yes"]
-        qs = Notification.objects.all()
+        qs = Notification.objects.filter(voter__isnull=True)
         if not show_history:
             qs = qs.filter(is_hidden=False)
         qs = qs.order_by("-created_at", "-id")[:200]  # cap to avoid huge payloads
-        unread_count = Notification.objects.filter(is_read=False, is_hidden=False).count()
+        unread_count = (
+            Notification.objects.filter(voter__isnull=True, is_read=False, is_hidden=False).count()
+        )
         return Response(
             {
                 "items": NotificationSerializer(qs, many=True).data,

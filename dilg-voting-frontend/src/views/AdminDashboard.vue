@@ -218,16 +218,6 @@ const loadNominations = async () => {
   if (unseen) {
     hasNewNominations.value = true
     lastNewNominations.value = newOnes.map((n) => `${n.nominee_full_name} (${n.position_name})`)
-    // Surface a lightweight notification so admins notice new nominations
-    newOnes.forEach((n) => {
-      notifications.value.unshift({
-        id: `local-nom-${n.id}-${Date.now()}`,
-        message: `New nomination: ${n.nominee_full_name} (${n.position_name})`,
-        created_at: new Date().toISOString(),
-        read: false,
-      })
-      unreadNotifications.value += 1
-    })
   }
   nominationsSeen.value = incomingIds
   if (activeSection.value === 'nominations') {
