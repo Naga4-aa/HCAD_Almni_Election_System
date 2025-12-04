@@ -178,7 +178,9 @@ const saveDraft = () => {
   const key = draftKey()
   if (!key) return
   const payload = {
-    selections: selections.value,
+    selections: Object.fromEntries(
+      Object.entries(selections.value || {}).map(([pid, cid]) => [pid, Number(cid)]),
+    ),
     consent: consent.value,
   }
   localStorage.setItem(key, JSON.stringify(payload))
@@ -194,8 +196,8 @@ const restoreDraft = () => {
     const parsed = JSON.parse(raw)
     const restored = {}
     positions.value.forEach((pos) => {
-      const candidateId = parsed.selections?.[pos.id]
-      const valid = (candidatesByPosition.value[pos.id] || []).some((c) => c.id === candidateId)
+      const candidateId = Number(parsed.selections?.[pos.id])
+      const valid = (candidatesByPosition.value[pos.id] || []).some((c) => Number(c.id) === candidateId)
       if (valid) restored[pos.id] = candidateId
     })
     selections.value = restored
