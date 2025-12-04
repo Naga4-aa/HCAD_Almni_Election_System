@@ -33,7 +33,9 @@ api.interceptors.response.use(
       const adminStore = useAdminAuthStore()
       const currentRoute = router.currentRoute.value
       const isAdminRoute =
-        currentRoute?.name?.toString().startsWith('admin') || currentRoute?.path?.startsWith('/admin')
+        currentRoute?.meta?.requiresAdmin ||
+        currentRoute?.name?.toString().startsWith('admin') ||
+        currentRoute?.path?.startsWith('/admin')
 
       if (isAdminRoute) {
         if (adminStore?.isAuthenticated) {
@@ -41,14 +43,11 @@ api.interceptors.response.use(
         }
         router.push('/admin-login')
       } else {
-        // Default to the voter login unless the user is currently in an admin context
+        // Always send voter-side routes to voter login to avoid crossing contexts
         if (authStore?.isAuthenticated) {
           authStore.logout()
-          router.push('/login')
-        } else if (adminStore?.isAuthenticated) {
-          adminStore.logout()
-          router.push('/admin-login')
         }
+        router.push('/login')
       }
     }
     return Promise.reject(error)
