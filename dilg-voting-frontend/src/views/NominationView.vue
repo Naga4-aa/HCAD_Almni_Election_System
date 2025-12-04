@@ -394,10 +394,10 @@ onUnmounted(() => {
         </div>
       </div>
 
-      <div class="rounded-2xl bg-gradient-to-br from-emerald-50 via-slate-50 to-white border border-emerald-100 shadow-inner p-3 sm:p-4 space-y-3">
+      <div class="rounded-2xl bg-gradient-to-br from-[rgba(196,151,60,0.12)] via-white to-[rgba(15,35,66,0.05)] border border-[rgba(196,151,60,0.35)] shadow-inner p-3 sm:p-4 space-y-3">
         <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div class="flex items-center gap-2">
-            <span class="inline-flex items-center justify-center rounded-full bg-emerald-100 text-emerald-800 text-[11px] font-semibold px-2 py-1 border border-emerald-200">
+            <span class="inline-flex items-center justify-center rounded-full text-[var(--hcad-navy)] text-[11px] font-semibold px-2 py-1 border border-[rgba(196,151,60,0.6)] bg-gradient-to-r from-[rgba(196,151,60,0.18)] to-[rgba(15,35,66,0.08)]">
               Current candidates
             </span>
             <p class="text-[11px] text-slate-600">Official nominees already in the tally, by position.</p>
@@ -405,7 +405,7 @@ onUnmounted(() => {
           <button
             @click="loadCandidates"
             :disabled="candidatesLoading"
-            class="self-start text-xs px-3 py-1.5 rounded-lg border border-emerald-200 bg-white text-emerald-800 hover:bg-emerald-50 disabled:opacity-60 shadow-sm"
+            class="self-start text-xs px-3 py-1.5 rounded-lg border border-[rgba(196,151,60,0.5)] bg-white text-[var(--hcad-navy)] hover:bg-[rgba(196,151,60,0.1)] disabled:opacity-60 shadow-sm"
           >
             {{ candidatesLoading ? 'Refreshing...' : 'Refresh list' }}
           </button>
@@ -441,7 +441,7 @@ onUnmounted(() => {
               v-for="p in positions"
               :key="p.id"
               class="px-3 py-1.5 rounded-lg text-xs border"
-              :class="candidateTab === p.id ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm' : 'border-slate-300 bg-white hover:bg-emerald-50'"
+              :class="candidateTab === p.id ? 'bg-[var(--hcad-navy)] text-white border-[var(--hcad-navy)] shadow-sm' : 'border-[rgba(196,151,60,0.5)] bg-white hover:bg-[rgba(196,151,60,0.12)]'"
               @click="candidateTab = p.id"
             >
               {{ p.name_display || p.name }}
@@ -479,7 +479,7 @@ onUnmounted(() => {
         </div>
       </div>
 
-      <p v-if="myNomination" class="text-sm bg-emerald-50 border border-emerald-100 rounded-xl p-3" :class="myNomination.status === 'rejected' ? 'text-amber-700' : 'text-emerald-700'">
+      <p v-if="myNomination" class="text-sm bg-[rgba(196,151,60,0.08)] border border-[rgba(196,151,60,0.35)] rounded-xl p-3" :class="myNomination.status === 'rejected' ? 'text-amber-700' : 'text-[var(--hcad-navy)]'">
         <span v-if="myNomination.status === 'promoted'">
           Your nomination of <span class="font-semibold">{{ myNomination.nominee_full_name }}</span> for {{ myNomination.position_name }} was promoted. Thank you!
         </span>

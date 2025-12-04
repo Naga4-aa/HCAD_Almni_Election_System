@@ -587,7 +587,7 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="space-y-6 w-full max-w-full mx-0 px-0 sm:px-2 lg:px-3">
+  <div class="admin-dashboard space-y-6 w-full max-w-full mx-0 px-0 sm:px-2 lg:px-3">
     <div class="flex flex-col lg:grid lg:grid-cols-[360px_minmax(0,1fr)] gap-4 lg:gap-6 w-full">
       <aside class="w-full lg:w-auto lg:sticky lg:top-16 bg-white/95 border border-emerald-100 rounded-2xl shadow-sm p-4 space-y-4 lg:min-h-[calc(100vh-140px)] overflow-auto flex flex-col lg:min-w-[360px]">
         <div class="space-y-1">
@@ -602,7 +602,7 @@ onUnmounted(() => {
             :key="s.key"
             @click="activeSection = s.key"
             class="text-sm w-full text-left px-3 py-2 rounded-xl border transition flex items-center gap-2 whitespace-nowrap"
-            :class="activeSection === s.key ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm' : 'border-slate-200 text-slate-700 hover:bg-emerald-50'"
+            :class="activeSection === s.key ? 'bg-[var(--hcad-navy)] text-white border-[var(--hcad-gold)] shadow-sm' : 'border-[rgba(196,151,60,0.45)] text-slate-700 hover:bg-[rgba(196,151,60,0.12)]'"
           >
             <span>{{ s.label }}</span>
             <span
@@ -648,21 +648,21 @@ onUnmounted(() => {
 
 
     <div v-if="activeSection === 'stats' && stats" id="stats" class="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 w-full">
-      <div class="bg-gradient-to-br from-emerald-50 via-white to-slate-50 rounded-2xl border border-emerald-100 p-4 sm:p-5 shadow-sm">
+      <div class="bg-gradient-to-br from-[rgba(196,151,60,0.12)] via-white to-[rgba(15,35,66,0.05)] rounded-2xl border border-[rgba(196,151,60,0.35)] p-4 sm:p-5 shadow-sm">
         <p class="text-xs text-slate-500">Total voters</p>
         <p class="text-2xl font-semibold">{{ stats.total_voters }}</p>
       </div>
-      <div class="bg-gradient-to-br from-emerald-50 via-white to-slate-50 rounded-2xl border border-emerald-100 p-4 sm:p-5 shadow-sm">
+      <div class="bg-gradient-to-br from-[rgba(196,151,60,0.12)] via-white to-[rgba(15,35,66,0.05)] rounded-2xl border border-[rgba(196,151,60,0.35)] p-4 sm:p-5 shadow-sm">
         <p class="text-xs text-slate-500">Voted</p>
         <p class="text-2xl font-semibold">{{ stats.voted_count }}</p>
       </div>
-      <div class="bg-gradient-to-br from-emerald-50 via-white to-slate-50 rounded-2xl border border-emerald-100 p-4 sm:p-5 shadow-sm">
+      <div class="bg-gradient-to-br from-[rgba(196,151,60,0.12)] via-white to-[rgba(15,35,66,0.05)] rounded-2xl border border-[rgba(196,151,60,0.35)] p-4 sm:p-5 shadow-sm">
         <p class="text-xs text-slate-500">Turnout</p>
         <p class="text-2xl font-semibold">{{ stats.turnout_percent }}%</p>
       </div>
     </div>
 
-    <div v-if="activeSection === 'tally'" id="tally" class="bg-gradient-to-br from-emerald-50 via-white to-slate-50 rounded-2xl border border-emerald-100 p-4 sm:p-5 shadow-sm">
+    <div v-if="activeSection === 'tally'" id="tally" class="bg-gradient-to-br from-[rgba(196,151,60,0.12)] via-white to-[rgba(15,35,66,0.05)] rounded-2xl border border-[rgba(196,151,60,0.35)] p-4 sm:p-5 shadow-sm">
       <h3 class="text-sm font-semibold mb-3">Per-position tally</h3>
       <div class="flex flex-wrap gap-2 mb-3">
         <button
@@ -754,7 +754,7 @@ onUnmounted(() => {
         </div>
       </div>
 
-    <div v-if="activeSection === 'timeline'" id="timeline" class="bg-gradient-to-br from-emerald-50 via-white to-slate-50 rounded-2xl border border-emerald-100 p-4 sm:p-5 shadow-sm space-y-3">
+    <div v-if="activeSection === 'timeline'" id="timeline" class="bg-gradient-to-br from-[rgba(196,151,60,0.12)] via-white to-[rgba(15,35,66,0.05)] rounded-2xl border border-[rgba(196,151,60,0.35)] p-4 sm:p-5 shadow-sm space-y-3">
       <div class="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
         <h3 class="text-sm font-semibold leading-tight">Election timeline</h3>
         <span class="text-[11px] text-slate-500">Nomination & voting windows</span>
@@ -766,14 +766,14 @@ onUnmounted(() => {
         <span class="font-semibold text-slate-700">Mode:</span>
         <button
           @click="switchMode('timeline')"
-          :class="timelineMode === 'timeline' ? 'bg-emerald-600 text-white border border-emerald-600 shadow-sm' : 'border border-slate-300 text-slate-700 hover:bg-slate-100'"
+          :class="timelineMode === 'timeline' ? 'bg-[var(--hcad-navy)] text-white border border-[var(--hcad-gold)] shadow-sm' : 'border border-[rgba(196,151,60,0.45)] text-slate-700 hover:bg-[rgba(196,151,60,0.12)]'"
           class="px-3 py-1.5 rounded-full transition"
         >
           Timeline (use dates)
         </button>
         <button
           @click="switchMode('demo')"
-          :class="timelineMode === 'demo' ? 'bg-slate-900 text-white border border-slate-900 shadow-sm' : 'border border-slate-300 text-slate-700 hover:bg-slate-100'"
+          :class="timelineMode === 'demo' ? 'bg-[var(--hcad-navy)] text-white border border-[var(--hcad-gold)] shadow-sm' : 'border border-[rgba(196,151,60,0.45)] text-slate-700 hover:bg-[rgba(196,151,60,0.12)]'"
           class="px-3 py-1.5 rounded-full transition"
         >
           Demo (manual phases)
@@ -823,7 +823,7 @@ onUnmounted(() => {
           <button
             @click="clearTimelineDates"
             type="button"
-            class="px-3 py-1.5 rounded-lg border border-emerald-200 text-xs hover:bg-emerald-50 bg-white shadow-sm"
+            class="px-3 py-1.5 rounded-lg border border-[var(--hcad-gold)] text-xs hover:bg-[rgba(196,151,60,0.12)] bg-white shadow-sm"
           >
             Clear dates
           </button>
@@ -836,7 +836,7 @@ onUnmounted(() => {
         <button
           @click="saveElection"
           :disabled="savingElection || timelineMode === 'demo'"
-          class="px-4 py-2 rounded-lg bg-emerald-600 text-white text-sm shadow-sm disabled:bg-slate-300"
+          class="px-4 py-2 rounded-lg bg-[var(--hcad-navy)] text-white text-sm shadow-sm disabled:bg-slate-300"
         >
           {{ savingElection ? 'Saving.' : 'Save timeline' }}
         </button>
@@ -848,7 +848,7 @@ onUnmounted(() => {
             @click="publishResults(!election.results_published)"
             :disabled="publishingResults"
             class="px-3 py-1.5 rounded-lg border text-xs"
-            :class="election.results_published ? 'border-amber-400 text-amber-700 bg-amber-50' : 'border-emerald-500 text-emerald-700 bg-emerald-50'"
+            :class="election.results_published ? 'border-amber-400 text-amber-700 bg-amber-50' : 'border-[var(--hcad-gold)] text-[var(--hcad-navy)] bg-[rgba(196,151,60,0.12)]'"
           >
             {{ publishingResults ? 'Updating.' : election.results_published ? 'Unpublish results' : 'Publish results' }}
           </button>
@@ -902,7 +902,7 @@ onUnmounted(() => {
       </div>
     </div>
 
-    <div v-if="activeSection === 'nominations'" id="nominations" class="bg-gradient-to-br from-emerald-50 via-white to-slate-50 rounded-2xl border border-emerald-100 p-4 sm:p-5 shadow-sm space-y-3">
+    <div v-if="activeSection === 'nominations'" id="nominations" class="bg-gradient-to-br from-[rgba(196,151,60,0.12)] via-white to-[rgba(15,35,66,0.05)] rounded-2xl border border-[rgba(196,151,60,0.35)] p-4 sm:p-5 shadow-sm space-y-3">
       <div class="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
         <h3 class="text-sm font-semibold">Nominations</h3>
         <p class="text-[11px] text-slate-500">Promote to make official candidates.</p>
@@ -961,7 +961,7 @@ onUnmounted(() => {
       </div>
     </div>
 
-    <div v-if="activeSection === 'reminders'" id="reminders" class="bg-gradient-to-br from-emerald-50 via-white to-slate-50 rounded-2xl border border-emerald-100 p-4 sm:p-5 shadow-sm space-y-2">
+    <div v-if="activeSection === 'reminders'" id="reminders" class="bg-gradient-to-br from-[rgba(196,151,60,0.12)] via-white to-[rgba(15,35,66,0.05)] rounded-2xl border border-[rgba(196,151,60,0.35)] p-4 sm:p-5 shadow-sm space-y-2">
       <h3 class="text-sm font-semibold">Reminders</h3>
       <div v-if="!reminders.length" class="text-xs text-slate-500">No reminders stored.</div>
       <ul v-else class="text-sm text-slate-700 list-disc list-inside">
@@ -969,7 +969,7 @@ onUnmounted(() => {
       </ul>
     </div>
 
-    <div v-if="activeSection === 'voters'" id="voters" class="bg-gradient-to-br from-emerald-50 via-white to-slate-50 rounded-2xl border border-emerald-100 p-4 sm:p-5 shadow-sm space-y-3">
+    <div v-if="activeSection === 'voters'" id="voters" class="bg-gradient-to-br from-[rgba(196,151,60,0.12)] via-white to-[rgba(15,35,66,0.05)] rounded-2xl border border-[rgba(196,151,60,0.35)] p-4 sm:p-5 shadow-sm space-y-3">
       <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <h3 class="text-sm font-semibold">Voters</h3>
         <div class="flex flex-wrap gap-2">
@@ -1069,4 +1069,27 @@ onUnmounted(() => {
     </div>
   </div>
 </template>
+
+<style>
+/* Gold gradient accents for form fields */
+.admin-dashboard input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='button']):not([type='submit']):not([type='reset']),
+.admin-dashboard textarea,
+.admin-dashboard select {
+  border: 1px solid transparent;
+  background-image: linear-gradient(#ffffff, #ffffff),
+    linear-gradient(135deg, rgba(196, 151, 60, 0.6), rgba(15, 35, 66, 0.3));
+  background-origin: border-box;
+  background-clip: padding-box, border-box;
+  box-shadow: 0 2px 10px rgba(15, 35, 66, 0.06);
+  transition: box-shadow 150ms ease, transform 150ms ease;
+}
+
+.admin-dashboard input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='button']):not([type='submit']):not([type='reset']):focus,
+.admin-dashboard textarea:focus,
+.admin-dashboard select:focus {
+  box-shadow: 0 4px 14px rgba(15, 35, 66, 0.12);
+  transform: translateY(-1px);
+  outline: none;
+}
+</style>
 

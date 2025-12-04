@@ -564,7 +564,7 @@ watch(
       </div>
     </header>
 
-    <main :class="isAdminContext ? 'max-w-full mx-0 px-2 sm:px-3 lg:px-4 py-6' : 'max-w-screen-2xl mx-auto px-3 sm:px-4 py-6'">
+    <main :class="['max-w-full mx-0 px-2 sm:px-3 lg:px-4 py-6', isAdminContext ? 'admin-dashboard' : 'voter-shell']">
       <RouterView />
     </main>
   </div>
@@ -683,5 +683,45 @@ button:active,
 a[class*='rounded']:active {
   transform: translateY(-0.5px);
   box-shadow: 0 3px 10px rgba(0, 0, 0, 0.12);
+}
+
+/* Gold-accent form fields (admin) */
+.admin-dashboard input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='button']):not([type='submit']):not([type='reset']),
+.admin-dashboard textarea,
+.admin-dashboard select {
+  border: 1px solid transparent;
+  background-image: linear-gradient(#ffffff, #ffffff),
+    linear-gradient(135deg, rgba(196, 151, 60, 0.6), rgba(15, 35, 66, 0.3));
+  background-origin: border-box;
+  background-clip: padding-box, border-box;
+  box-shadow: 0 2px 10px rgba(15, 35, 66, 0.06);
+  transition: box-shadow 150ms ease, transform 150ms ease;
+}
+.admin-dashboard input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='button']):not([type='submit']):not([type='reset']):focus,
+.admin-dashboard textarea:focus,
+.admin-dashboard select:focus {
+  box-shadow: 0 4px 14px rgba(15, 35, 66, 0.12);
+  transform: translateY(-1px);
+  outline: none;
+}
+
+/* Gold-accent form fields (voter) */
+.voter-shell input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='button']):not([type='submit']):not([type='reset']),
+.voter-shell textarea,
+.voter-shell select {
+  border: 1px solid transparent;
+  background-image: linear-gradient(#ffffff, #ffffff),
+    linear-gradient(135deg, rgba(196, 151, 60, 0.55), rgba(15, 35, 66, 0.28));
+  background-origin: border-box;
+  background-clip: padding-box, border-box;
+  box-shadow: 0 2px 10px rgba(15, 35, 66, 0.06);
+  transition: box-shadow 150ms ease, transform 150ms ease;
+}
+.voter-shell input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='button']):not([type='submit']):not([type='reset']):focus,
+.voter-shell textarea:focus,
+.voter-shell select:focus {
+  box-shadow: 0 4px 14px rgba(15, 35, 66, 0.12);
+  transform: translateY(-1px);
+  outline: none;
 }
 </style>
