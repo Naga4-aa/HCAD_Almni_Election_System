@@ -1,6 +1,6 @@
 ﻿<!-- src/views/AdminDashboard.vue -->
 <script setup>
-import { ref, onMounted, watch, computed } from 'vue'
+import { ref, onMounted, onUnmounted, watch, computed } from 'vue'
 import api from '../api'
 import { useAdminAuthStore } from '../stores/adminAuth'
 import { useRouter } from 'vue-router'
@@ -25,6 +25,10 @@ const publishedResults = ref(null)
 const loadingPublishedResults = ref(false)
 const demoMessage = ref('')
 const demoError = ref('')
+const tallyTab = ref(null)
+const activeTally = computed(() => {
+  return tally.value?.find((p) => p.position_id === tallyTab.value) || null
+})
 const electionForm = ref({
   name: '',
   description: '',
@@ -68,6 +72,7 @@ const newVoter = ref({
 const resettingVoters = ref(false)
 const resetPins = ref(false)
 const resettingElection = ref(false)
+let tallyTimer = null
 
 // Themed confirm dialog
 const confirmDialog = ref({
@@ -141,6 +146,19 @@ const loadTally = async () => {
   const res = await api.get('admin/tally/')
   tally.value = res.data || []
 }
+
+watch(
+  () => tally.value,
+  (list) => {
+    if (!list?.length) {
+      tallyTab.value = null
+      return
+    }
+    const stillExists = list.some((p) => p.position_id === tallyTab.value)
+    tallyTab.value = stillExists ? tallyTab.value : list[0]?.position_id
+  },
+  { immediate: true },
+)
 
 const loadPublishedResults = async () => {
   loadingPublishedResults.value = true
@@ -582,19 +600,28 @@ onMounted(async () => {
       loadReminders(),
       loadElection(),
       loadVoters(),
-      loadNotifications(),
     ])
   } catch (err) {
     errorMessage.value = 'Failed to load admin data.'
   } finally {
     loading.value = false
   }
+
+  // Auto-refresh tally/stats so timeline/demo changes reflect without manual refresh
+  tallyTimer = setInterval(() => {
+    loadTally()
+    loadStats()
+  }, 10000)
+})
+
+onUnmounted(() => {
+  if (tallyTimer) clearInterval(tallyTimer)
 })
 </script>
 
 <template>
   <div class="space-y-6 w-full max-w-screen-2xl mx-auto px-3 sm:px-4 lg:px-6">
-    <div class="flex flex-col lg:grid lg:grid-cols-[380px_minmax(0,1fr)] gap-6 w-full">
+    <div class="flex flex-col lg:grid lg:grid-cols-[320px_minmax(0,1fr)] gap-4 lg:gap-6 w-full">
       <aside class="w-full lg:w-auto lg:sticky lg:top-16 bg-white/95 border border-emerald-100 rounded-2xl shadow-sm p-4 space-y-4 lg:min-h-[calc(100vh-140px)] overflow-auto flex flex-col">
         <div class="space-y-1">
           <p class="text-[11px] uppercase tracking-wide text-emerald-600 font-semibold">Admin</p>
@@ -625,51 +652,6 @@ onMounted(async () => {
       </aside>
 
       <div class="flex-1 space-y-6 min-w-0 w-full">
-        <div class="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 shadow-sm flex flex-col gap-3 w-full">
-          <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-            <div class="flex flex-wrap items-center gap-2">
-              <span class="text-sm font-semibold">Notifications</span>
-              <span class="text-[11px] px-2 py-1 rounded-full" :class="unreadNotifications ? 'bg-rose-100 text-rose-700' : 'bg-emerald-50 text-emerald-700'">
-                {{ unreadNotifications }} unread
-              </span>
-              <button @click="notificationsCollapsed = !notificationsCollapsed" class="text-xs px-3 py-1.5 rounded-lg border border-slate-300 hover:bg-slate-100">
-                {{ notificationsCollapsed ? 'Expand' : 'Collapse' }}
-              </button>
-              <button @click="showHistory = !showHistory; loadNotifications()" class="text-xs px-3 py-1.5 rounded-lg border border-slate-300 hover:bg-slate-100">
-                {{ showHistory ? 'Hide history' : 'Show history' }}
-              </button>
-            </div>
-            <div class="flex flex-wrap gap-2 justify-start lg:justify-end">
-              <button @click="loadNotifications" class="text-xs px-3 py-1.5 rounded-lg border border-slate-300 hover:bg-slate-100" :disabled="notificationsLoading">Refresh</button>
-              <button @click="markAllNotificationsRead" class="text-xs px-3 py-1.5 rounded-lg border border-emerald-400 text-emerald-700 bg-emerald-50" :disabled="notificationsLoading || unreadNotifications === 0">Mark all read</button>
-              <button @click="deleteAllNotifications" class="text-xs px-3 py-1.5 rounded-lg border border-rose-300 text-rose-700 bg-rose-50" :disabled="notificationsLoading || !notifications.length">Delete all</button>
-            </div>
-          </div>
-          <p v-if="notificationsError" class="text-[11px] text-rose-600">{{ notificationsError }}</p>
-          <div v-else-if="notificationsCollapsed" class="text-[11px] text-slate-600">Notifications collapsed.</div>
-          <div v-else-if="notificationsLoading" class="text-[11px] text-slate-600">Loading notifications...</div>
-          <div v-else-if="!notifications.length" class="text-[11px] text-slate-500">No notifications yet.</div>
-          <ul
-            v-else
-            class="divide-y divide-slate-200 text-[11px] text-slate-700 pr-1"
-            style="max-height: 260px; overflow-y: auto;"
-          >
-            <li v-for="n in notifications" :key="n.id" class="py-2 flex items-start gap-2">
-              <span class="mt-0.5 h-2 w-2 rounded-full" :class="n.is_read ? 'bg-slate-300' : 'bg-emerald-500'"></span>
-              <div class="flex-1">
-                <p class="font-semibold capitalize text-slate-800">{{ n.type }}</p>
-                <p class="text-slate-700">{{ n.message }}</p>
-                <p class="text-[10px] text-slate-500">{{ formatDateTime(n.created_at) }}</p>
-              </div>
-              <div class="flex gap-1">
-                <button @click="dismissNotification(n.id)" class="text-[10px] px-2 py-1 rounded border border-slate-300 hover:bg-slate-100">Hide</button>
-                <button @click="deleteNotification(n.id)" class="text-[10px] px-2 py-1 rounded border border-rose-300 text-rose-700 hover:bg-rose-50">Delete</button>
-              </div>
-            </li>
-          </ul>
-          <p v-if="showHistory && !notificationsCollapsed" class="text-[10px] text-slate-500">History view includes hidden items; delete removes them permanently.</p>
-        </div>
-
         <div v-if="loading" class="text-sm text-slate-500">Loading dashboard.</div>
         <p v-if="errorMessage" class="text-sm text-rose-600">{{ errorMessage }}</p>
 
@@ -691,30 +673,42 @@ onMounted(async () => {
 
     <div v-if="activeSection === 'tally'" id="tally" class="bg-gradient-to-br from-emerald-50 via-white to-slate-50 rounded-2xl border border-emerald-100 p-4 sm:p-5 shadow-sm">
       <h3 class="text-sm font-semibold mb-3">Per-position tally</h3>
-      <div class="grid gap-4 md:grid-cols-2">
-        <div v-for="pos in tally" :key="pos.position_id" class="border border-emerald-100 rounded-xl p-3 space-y-3 bg-white/90 shadow-sm">
-          <div class="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-            <p class="text-sm font-semibold">{{ pos.position }}</p>
-            <span class="text-[11px] text-slate-500">{{ pos.candidates.length }} candidate(s)</span>
+      <div class="flex flex-wrap gap-2 mb-3">
+        <button
+          v-for="pos in tally"
+          :key="pos.position_id"
+          class="px-3 py-1.5 rounded-lg text-xs border"
+          :class="tallyTab === pos.position_id ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm' : 'border-slate-300 bg-white hover:bg-emerald-50'"
+          @click="tallyTab = pos.position_id"
+        >
+          {{ pos.position }}
+        </button>
+      </div>
+      <div v-if="tallyTab && activeTally" class="border border-emerald-100 rounded-xl p-3 space-y-3 bg-white/90 shadow-sm">
+        <div class="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p class="text-sm font-semibold">{{ activeTally.position }}</p>
+            <span class="text-[11px] text-slate-500">{{ activeTally.candidates.length }} candidate(s)</span>
           </div>
-          <div class="space-y-2">
-            <div v-for="cand in pos.candidates" :key="cand.candidate_id" class="text-sm rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
-              <div class="flex justify-between mb-1 items-center gap-2">
-                <span class="font-semibold text-slate-800">{{ cand.full_name }}</span>
-                <span class="font-semibold text-slate-700 text-xs px-2 py-0.5 rounded-full bg-white border border-slate-200">{{ cand.votes }} vote(s)</span>
-              </div>
-              <div class="h-2.5 rounded-full bg-slate-100 overflow-hidden">
-                <div
-                  class="h-full rounded-full bg-gradient-to-r from-[var(--hcad-gold)] to-[var(--hcad-navy)] transition-all duration-300"
-                  :style="{
-                    width: (Math.max(...pos.candidates.map(c => c.votes), 1) ? (cand.votes / Math.max(...pos.candidates.map(c => c.votes), 1)) * 100 : 0) + '%'
-                  }"
-                ></div>
-              </div>
+        </div>
+        <div class="space-y-2">
+          <div v-for="cand in activeTally.candidates" :key="cand.candidate_id" class="text-sm rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+            <div class="flex justify-between mb-1 items-center gap-2">
+              <span class="font-semibold text-slate-800">{{ cand.full_name }}</span>
+              <span class="font-semibold text-slate-700 text-xs px-2 py-0.5 rounded-full bg-white border border-slate-200">{{ cand.votes }} vote(s)</span>
+            </div>
+            <div class="h-2.5 rounded-full bg-slate-100 overflow-hidden">
+              <div
+                class="h-full rounded-full bg-gradient-to-r from-[var(--hcad-gold)] to-[var(--hcad-navy)] transition-all duration-300"
+                :style="{
+                  width: (Math.max(...activeTally.candidates.map(c => c.votes), 1) ? (cand.votes / Math.max(...activeTally.candidates.map(c => c.votes), 1)) * 100 : 0) + '%'
+                }"
+              ></div>
             </div>
           </div>
         </div>
       </div>
+      <p v-else class="text-sm text-slate-600">No positions to display.</p>
 
       <div class="mt-6 border-t border-slate-200 pt-4">
         <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between mb-3">

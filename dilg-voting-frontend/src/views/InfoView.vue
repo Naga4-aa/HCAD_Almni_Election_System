@@ -41,14 +41,14 @@ onMounted(() => {
     <div class="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
       <h2 class="text-xl font-semibold text-slate-900">Registration instructions</h2>
       <p class="text-sm text-slate-600 mt-2">
-        Alumni must be verified by an admin before logging in. Please provide your full name,
-        batch/year, campus/chapter, and contact number/email to the HCAD Alumni office or chapter
-        coordinator. They will generate your Voter ID and PIN.
+        Alumni can now enter with <strong>full name + batch/year</strong> (quick entry). Provide your campus/chapter and contact
+        details to help COMELEC verify you. Consent is required to proceed.
       </p>
       <ul class="text-sm text-slate-700 list-disc list-inside mt-3 space-y-1">
-        <li>You will receive a Voter ID (e.g., HCAD-0001) and a PIN (6 digits).</li>
-        <li>Keep them private. You can log in once the admin marks you as active.</li>
+        <li>Use your exact full name and batch/year so your record can be verified.</li>
+        <li>Optional: add campus/chapter and contact info to help admins confirm identity.</li>
         <li>You must check the consent box: "I agree to the processing of my personal data for the purpose of elections."</li>
+        <li>If admins disable quick entry, they may issue Voter IDs/PINs for manual login.</li>
       </ul>
     </div>
 

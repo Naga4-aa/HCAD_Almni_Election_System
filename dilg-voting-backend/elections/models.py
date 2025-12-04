@@ -281,7 +281,8 @@ class Notification(models.Model):
     type = models.CharField(max_length=80, default="info")
     message = models.TextField()
     is_read = models.BooleanField(default=False)
-    is_hidden = models.BooleanField(default=False)
+    # Legacy column name in MySQL is "dismissed"; map it here to avoid migration mismatch.
+    is_hidden = models.BooleanField(default=False, db_column="dismissed")
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

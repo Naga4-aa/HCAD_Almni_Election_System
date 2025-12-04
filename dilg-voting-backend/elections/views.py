@@ -45,6 +45,21 @@ from .serializers import (
 
 User = get_user_model()
 
+# -----------------------
+# HELPERS
+# -----------------------
+
+def normalize_name(val: str) -> str:
+    """
+    Simple normalization to reduce accidental duplicates:
+    - lowercase
+    - strip leading/trailing whitespace
+    - collapse internal whitespace
+    """
+    if not val:
+        return ""
+    return " ".join(val.strip().lower().split())
+
 
 # =======================
 #  HELPERS
@@ -134,20 +149,27 @@ def voter_quick_login(request):
     if not consent:
         return Response({"error": "Consent is required to continue"}, status=400)
 
-    voter = (
-        Voter.objects.filter(
-            Q(name__iexact=raw_name.strip()),
-            batch_year=batch_year,
-        )
-        .order_by("id")
-        .first()
-    )
+    normalized = normalize_name(raw_name)
+
+    # Try to find an existing voter with the same normalized name + batch to avoid duplicates
+    candidate_voters = Voter.objects.filter(batch_year=batch_year).order_by("id")
+    voter = None
+    for v in candidate_voters:
+        if normalize_name(v.name) == normalized:
+            voter = v
+            break
 
     if voter:
         voter.is_active = True
         voter.privacy_consent = True
         voter.save(update_fields=["is_active", "privacy_consent"])
         voter.start_session()
+        Notification.objects.create(
+            type="login",
+            message=f"Voter '{voter.name}' batch {voter.batch_year} signed in via quick entry.",
+            is_hidden=False,
+            is_read=False,
+        )
     else:
         voter = Voter.objects.create(
             name=raw_name.strip(),
@@ -157,6 +179,12 @@ def voter_quick_login(request):
             is_active=True,
         )
         voter.start_session()
+        Notification.objects.create(
+            type="info",
+            message=f"Quick login created voter '{voter.name}' batch {voter.batch_year} (ID {voter.voter_id}).",
+            is_hidden=False,
+            is_read=False,
+        )
 
     return Response(
         {

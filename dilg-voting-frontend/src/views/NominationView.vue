@@ -31,6 +31,16 @@ const errorMessage = ref('')
 const loading = ref(false)
 const submitting = ref(false)
 const lastElectionId = ref(null)
+const candidateTab = ref(null)
+const activeCandidatePosition = computed(() => {
+  return positions.value.find((p) => p.id === candidateTab.value) || null
+})
+const activeCandidates = computed(() => {
+  const pid = candidateTab.value
+  if (!pid) return []
+  return candidatesByPosition.value[pid] || []
+})
+const lastSignature = ref(null)
 
 const isDemoMode = computed(() => election.value?.mode === 'demo')
 const isNominationOpen = computed(() => {
@@ -128,6 +138,7 @@ const loadPositions = async () => {
 const loadCandidates = async () => {
   if (!positions.value.length) {
     candidatesByPosition.value = {}
+    candidateTab.value = null
     return
   }
 
@@ -146,6 +157,14 @@ const loadCandidates = async () => {
       map[id] = items
     })
     candidatesByPosition.value = map
+    if (!candidateTab.value) {
+      candidateTab.value = positions.value[0]?.id || null
+    } else {
+      const stillExists = positions.value.some((p) => p.id === candidateTab.value)
+      if (!stillExists) {
+        candidateTab.value = positions.value[0]?.id || null
+      }
+    }
   } catch (err) {
     console.error(err)
     candidatesError.value = 'Failed to load candidate list.'
@@ -213,34 +232,60 @@ const submitNomination = async () => {
 }
 
 let timerId
-let refreshing = false
+let refreshTimerId
+let refreshingElection = false
+
+const buildSignature = () => {
+  if (!election.value?.id) return null
+  return [
+    election.value.id,
+    election.value.mode,
+    election.value.demo_phase || '',
+    election.value.nomination_start || '',
+    election.value.nomination_end || '',
+    election.value.voting_start || '',
+    election.value.voting_end || '',
+  ].join('|')
+}
 
 const tick = async () => {
   now.value = Date.now()
-  if (refreshing) return
-  refreshing = true
+}
+
+const refreshElectionData = async () => {
+  if (refreshingElection) return
+  refreshingElection = true
   try {
     await loadElection()
     const currentId = election.value?.id || null
     const active = !!election.value?.is_active
     const timelineReady = hasTimeline.value
+    const signature = buildSignature()
+
     if (!active || !currentId || !timelineReady) {
       positions.value = []
       myNomination.value = null
       candidatesByPosition.value = {}
       lastElectionId.value = null
+      lastSignature.value = null
       return
     }
-    if (lastElectionId.value !== currentId) {
+
+    const changed =
+      lastElectionId.value !== currentId ||
+      lastSignature.value !== signature
+
+    if (changed) {
       lastElectionId.value = currentId
+      lastSignature.value = signature
       await loadPositions()
       await loadMyNomination()
+      await loadCandidates()
     }
-    await loadCandidates()
-  } catch (e) {
-    // ignore transient errors
+  } catch (err) {
+    // ignore transient poll errors
   } finally {
-    refreshing = false
+    refreshingElection = false
   }
 }
 
@@ -255,13 +300,19 @@ onMounted(async () => {
   } else {
     lastElectionId.value = election.value?.id || null
     await loadCandidates()
+    lastSignature.value = buildSignature()
   }
   loading.value = false
-  timerId = setInterval(tick, 15000)
+  // Keep countdown ticking without disrupting form scroll position
+  timerId = setInterval(() => {
+    now.value = Date.now()
+  }, 15000)
+  refreshTimerId = setInterval(refreshElectionData, 10000)
 })
 
 onUnmounted(() => {
   if (timerId) clearInterval(timerId)
+  if (refreshTimerId) clearInterval(refreshTimerId)
 })
 </script>
 
@@ -305,34 +356,47 @@ onUnmounted(() => {
         </div>
         <p v-if="candidatesError" class="text-xs text-rose-600">{{ candidatesError }}</p>
         <p v-else-if="candidatesLoading" class="text-xs text-slate-600">Loading candidate list...</p>
-        <div v-else class="grid gap-3 md:grid-cols-2">
+        <div v-else>
+          <div class="flex flex-wrap gap-2 mb-3">
+            <button
+              v-for="p in positions"
+              :key="p.id"
+              class="px-3 py-1.5 rounded-lg text-xs border"
+              :class="candidateTab === p.id ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm' : 'border-slate-300 bg-white hover:bg-emerald-50'"
+              @click="candidateTab = p.id"
+            >
+              {{ p.name_display || p.name }}
+            </button>
+          </div>
           <div
-            v-for="p in positions"
-            :key="p.id"
+            v-if="activeCandidatePosition"
             class="rounded-xl border border-emerald-100 bg-white/90 p-3 space-y-2 shadow-sm"
           >
-            <div class="flex items-start justify-between gap-2">
-              <div>
-                <p class="text-sm font-semibold text-slate-800">{{ p.name_display || p.name }}</p>
-                <p class="text-[11px] text-slate-500">
-                  {{ (candidatesByPosition[p.id] || []).length }} candidate(s)
-                </p>
+            <div class="space-y-2">
+              <div class="flex items-start justify-between gap-2">
+                <div>
+                  <p class="text-sm font-semibold text-slate-800">{{ activeCandidatePosition.name_display || activeCandidatePosition.name }}</p>
+                  <p class="text-[11px] text-slate-500">
+                    {{ activeCandidates.length }} candidate(s)
+                  </p>
+                </div>
               </div>
-            </div>
-            <div v-if="(candidatesByPosition[p.id] || []).length" class="space-y-2">
-              <div
-                v-for="cand in candidatesByPosition[p.id]"
-                :key="cand.id"
-                class="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2"
-              >
-                <p class="text-sm font-semibold text-slate-800">{{ cand.full_name }}</p>
-                <p class="text-[11px] text-slate-500">
-                  Batch {{ cand.batch_year || 'N/A' }} - {{ cand.campus_chapter || 'Chapter not set' }}
-                </p>
+              <div v-if="activeCandidates.length" class="space-y-2">
+                <div
+                  v-for="cand in activeCandidates"
+                  :key="cand.id"
+                  class="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2"
+                >
+                  <p class="text-sm font-semibold text-slate-800">{{ cand.full_name }}</p>
+                  <p class="text-[11px] text-slate-500">
+                    Batch {{ cand.batch_year || 'N/A' }} - {{ cand.campus_chapter || 'Chapter not set' }}
+                  </p>
+                </div>
               </div>
+              <p v-else class="text-[11px] text-slate-500">No official candidates yet for this position.</p>
             </div>
-            <p v-else class="text-[11px] text-slate-500">No official candidates yet for this position.</p>
           </div>
+          <p v-else class="text-xs text-slate-600">No positions available.</p>
         </div>
       </div>
 

@@ -108,8 +108,8 @@ onMounted(async () => {
     <section class="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-3 text-sm text-slate-700">
       <h2 class="text-lg font-semibold text-slate-900">How to participate</h2>
       <ol class="list-decimal list-inside space-y-2">
-        <li>Request your Voter ID and PIN from the admin (President/COMELEC) for verification.</li>
-        <li>Log in with your Voter ID + PIN. Confirm the consent checkbox.</li>
+        <li>Use quick entry: enter your full name and batch/year, and check the consent box to proceed.</li>
+        <li>Optional: add campus/chapter and contact details so admins can verify you if needed.</li>
         <li>
           During
           <strong>{{ election ? formatRange(election.nomination_start, election.nomination_end) : 'the nomination window' }}</strong>:
