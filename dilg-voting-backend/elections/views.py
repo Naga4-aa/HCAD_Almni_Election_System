@@ -96,6 +96,26 @@ def get_admin_from_request(request):
         return None
 
 
+def maybe_auto_publish(election: Election):
+    """
+    Auto-publish results when the configured results_at time has passed and
+    auto_publish_results is enabled.
+    """
+    if not election or election.results_published:
+        return election
+    if not election.auto_publish_results or not election.results_at:
+        return election
+    now = timezone.now()
+    results_at = election.results_at
+    if timezone.is_naive(results_at):
+        results_at = timezone.make_aware(results_at, timezone.get_current_timezone())
+    if now >= results_at:
+        election.results_published = True
+        election.results_published_at = now
+        election.save(update_fields=["results_published", "results_published_at"])
+    return election
+
+
 # =======================
 #  VOTER AUTH
 # =======================
@@ -216,7 +236,7 @@ def voter_me(request):
 @api_view(["GET"])
 @permission_classes([AllowAny])
 def current_election(request):
-    election = get_active_election()
+    election = maybe_auto_publish(get_active_election())
     if not election:
         return Response({"has_election": False}, status=200)
     return Response({"has_election": True, "election": ElectionSerializer(election).data})
@@ -269,7 +289,7 @@ def published_results(request):
     Public: return per-position vote totals for the active election
     only when results are officially published.
     """
-    election = get_active_election()
+    election = maybe_auto_publish(get_active_election())
     if not election:
         return Response({"published": False, "reason": "no_active_election"}, status=200)
     if not election.results_published:
@@ -935,6 +955,7 @@ def admin_active_election(request):
         description = payload.get("description", "").strip()
         is_active = bool(payload.get("is_active", True))
         mode = (payload.get("mode") or "timeline").strip() or "timeline"
+        auto_publish_results = bool(payload.get("auto_publish_results", True))
 
         previous_election = Election.objects.order_by("-nomination_start", "-id").first()
         election = Election.objects.create(
@@ -946,6 +967,7 @@ def admin_active_election(request):
             voting_end=parsed["voting_end"],
             results_at=parsed["results_at"],
             is_active=is_active,
+            auto_publish_results=auto_publish_results,
             mode=mode if mode in ("timeline", "demo") else "timeline",
         )
 
@@ -976,10 +998,10 @@ def admin_active_election(request):
 
         return Response(ElectionSerializer(election).data, status=201)
 
-    election = get_active_election()
+    election = maybe_auto_publish(get_active_election())
     if not election:
         # Fallback to the most recent election so the admin UI can still edit
-        election = Election.objects.order_by("-nomination_start", "-id").first()
+        election = maybe_auto_publish(Election.objects.order_by("-nomination_start", "-id").first())
         if not election:
             return Response({"error": "No election configured"}, status=404)
 
@@ -1020,6 +1042,8 @@ def admin_active_election(request):
         fields["results_at"] = parsed["results_at"]
     if "is_active" in payload:
         fields["is_active"] = bool(payload.get("is_active"))
+    if "auto_publish_results" in payload:
+        fields["auto_publish_results"] = bool(payload.get("auto_publish_results"))
 
     # If nothing to update, just return current election data
     if not fields:
@@ -1183,6 +1207,7 @@ def admin_reset_election(request):
     election.voting_start = None
     election.voting_end = None
     election.results_at = None
+    election.auto_publish_results = True
     election.results_published = False
     election.results_published_at = None
     election.is_active = False
@@ -1193,6 +1218,7 @@ def admin_reset_election(request):
             "voting_start",
             "voting_end",
             "results_at",
+            "auto_publish_results",
             "results_published",
             "results_published_at",
             "is_active",

@@ -27,6 +27,7 @@ class ElectionSerializer(serializers.ModelSerializer):
             "voting_start",
             "voting_end",
             "results_at",
+            "auto_publish_results",
             "results_published",
             "results_published_at",
             "is_active",

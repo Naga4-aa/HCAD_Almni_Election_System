@@ -38,6 +38,7 @@ class Election(models.Model):
     voting_start = models.DateTimeField(null=True, blank=True)
     voting_end = models.DateTimeField(null=True, blank=True)
     results_at = models.DateTimeField(blank=True, null=True)
+    auto_publish_results = models.BooleanField(default=True)
     results_published = models.BooleanField(default=False)
     results_published_at = models.DateTimeField(blank=True, null=True)
     is_active = models.BooleanField(default=True)
