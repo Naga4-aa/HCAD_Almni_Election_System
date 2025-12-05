@@ -426,6 +426,17 @@ const saveElection = async () => {
 }
 
 const publishResults = async (publishFlag) => {
+  const confirmed = await askConfirm({
+    title: publishFlag ? 'Publish results' : 'Unpublish results',
+    message: publishFlag
+      ? 'Publish election results for all voters? This will make results visible immediately.'
+      : 'Unpublish results and hide them from voters?',
+    confirmText: publishFlag ? 'Publish' : 'Unpublish',
+    cancelText: 'Cancel',
+    tone: 'danger',
+  })
+  if (!confirmed) return
+
   publishingResults.value = true
   electionError.value = ''
   try {
@@ -465,6 +476,19 @@ const triggerDemoPhase = async (action) => {
 
 const switchMode = async (mode) => {
   if (!election.value || mode === timelineMode.value) return
+
+  const toDemo = mode === 'demo'
+  const confirmed = await askConfirm({
+    title: 'Switch election mode',
+    message: toDemo
+      ? 'Switch to Demo mode? Timeline dates will be hidden and phases will be controlled manually until you return to timeline mode.'
+      : 'Switch back to Timeline mode and follow the scheduled dates? Demo controls will be hidden.',
+    confirmText: toDemo ? 'Switch to Demo' : 'Switch to Timeline',
+    cancelText: 'Stay on current mode',
+    tone: 'danger',
+  })
+  if (!confirmed) return
+
   demoError.value = ''
   demoMessage.value = ''
   electionError.value = ''
@@ -838,7 +862,12 @@ onUnmounted(() => {
         <span class="text-[11px] text-slate-500">Nomination & voting windows</span>
       </div>
       <p v-if="electionError" class="text-xs text-rose-600">{{ electionError }}</p>
-      <p v-else-if="electionMessage" class="text-xs text-emerald-600">{{ electionMessage }}</p>
+      <p
+        v-else-if="electionMessage"
+        class="text-sm text-emerald-800 font-semibold inline-flex items-center gap-2 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2 shadow-[0_0_0_3px_rgba(16,185,129,0.15)]"
+      >
+        {{ electionMessage }}
+      </p>
       <p v-else-if="!election" class="text-xs text-slate-500">No election configured. Set the dates below and save to create one.</p>
       <div class="flex flex-wrap items-center gap-2 text-xs sm:text-sm">
         <span class="font-semibold text-slate-700">Mode:</span>
