@@ -42,6 +42,7 @@ const activeCandidates = computed(() => {
   if (!pid) return []
   return candidatesByPosition.value[pid] || []
 })
+const maxCandidateVotes = computed(() => Math.max(...activeCandidates.value.map((c) => c.votes || 0), 1))
 const lastSignature = ref(null)
 const voterNotifications = ref([])
 const voterUnread = ref(0)
@@ -462,21 +463,32 @@ onUnmounted(() => {
                   </p>
                 </div>
               </div>
-              <div v-if="activeCandidates.length" class="space-y-2">
-                <div
-                  v-for="cand in activeCandidates"
-                  :key="cand.id"
-                  class="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2"
-                >
-                  <div class="flex items-center gap-3">
-                    <div class="h-10 w-10 rounded-full border border-slate-200 bg-white overflow-hidden flex-shrink-0">
-                      <img :src="cand.photo_url || candidatePlaceholder" alt="Candidate" class="h-full w-full object-cover" />
+              <div v-if="activeCandidates.length" class="overflow-x-auto">
+                <div class="flex gap-6 pb-2 min-h-[320px]">
+                  <div
+                    v-for="cand in activeCandidates"
+                    :key="cand.id"
+                    class="bg-white border border-[rgba(196,151,60,0.35)] rounded-2xl shadow-sm p-4 flex flex-col gap-3 min-w-[320px]"
+                  >
+                    <div class="flex items-start gap-4">
+                      <div class="rounded-xl overflow-hidden bg-slate-100 border border-slate-200 h-[220px] w-[220px] flex-shrink-0">
+                        <img :src="cand.photo_url || candidatePlaceholder" alt="Candidate" class="h-full w-full object-cover" />
+                      </div>
+                      <div class="flex flex-col items-center gap-2 mt-1">
+                        <span class="text-xs text-slate-700 font-semibold whitespace-nowrap">{{ (cand.votes || 0) }} vote(s)</span>
+                        <div class="w-8 h-[180px] rounded-lg overflow-hidden border border-[rgba(196,151,60,0.5)] bg-slate-100 flex items-end">
+                          <div
+                            class="w-full bg-gradient-to-b from-[var(--hcad-navy)] to-[var(--hcad-gold)]"
+                            :style="{
+                              height: Math.max(14, ((cand.votes || 0) / maxCandidateVotes) * 180) + 'px'
+                            }"
+                          ></div>
+                        </div>
+                      </div>
                     </div>
-                    <div class="flex-1 min-w-0">
-                      <p class="text-sm font-semibold text-slate-800 truncate">{{ cand.full_name }}</p>
-                      <p class="text-[11px] text-slate-500">
-                        Batch {{ cand.batch_year || 'N/A' }} - {{ cand.campus_chapter || 'Chapter not set' }}
-                      </p>
+                    <div>
+                      <p class="text-xl font-semibold text-slate-900 leading-tight">{{ cand.full_name }}</p>
+                      <p class="text-sm text-slate-600">Batch {{ cand.batch_year || 'N/A' }}</p>
                     </div>
                   </div>
                 </div>

@@ -33,6 +33,10 @@ const lastNewNominations = ref([])
 const activeTally = computed(() => {
   return tally.value?.find((p) => p.position_id === tallyTab.value) || null
 })
+const maxTallyVotes = computed(() => {
+  if (!activeTally.value || !activeTally.value.candidates?.length) return 1
+  return Math.max(...activeTally.value.candidates.map((c) => c.votes || 0), 1)
+})
 const publishedResultsTab = ref(null)
 const activePublishedPosition = computed(() => {
   return publishedResults.value?.positions?.find((p) => p.position_id === publishedResultsTab.value) || null
@@ -714,41 +718,35 @@ onUnmounted(() => {
             <span class="text-[11px] text-slate-500">{{ activeTally.candidates.length }} candidate(s)</span>
           </div>
         </div>
-        <div class="space-y-3">
-          <div
-            v-for="cand in activeTally.candidates"
-            :key="cand.candidate_id"
-            class="text-sm rounded-lg border border-slate-200 bg-slate-50 px-3 py-3 space-y-2"
-          >
-            <div class="flex items-center justify-between gap-3 flex-wrap">
-              <div class="flex items-center gap-3 min-w-0">
-                <div class="h-14 w-14 rounded-xl border border-slate-200 bg-white overflow-hidden flex items-center justify-center">
+        <div v-if="activeTally.candidates.length" class="overflow-x-auto pb-2">
+          <div class="flex gap-5 min-h-[360px]">
+            <div
+              v-for="cand in activeTally.candidates"
+              :key="cand.candidate_id"
+              class="bg-white border border-[rgba(196,151,60,0.35)] rounded-2xl shadow-sm p-4 flex flex-col gap-3 min-w-[320px]"
+            >
+              <div class="flex items-start gap-4">
+                <div class="rounded-xl overflow-hidden bg-slate-100 border border-slate-200 h-[220px] w-[220px] flex-shrink-0">
                   <img :src="cand.photo_url || candidatePlaceholder" alt="Candidate photo" class="h-full w-full object-cover" />
                 </div>
-                <div class="min-w-0">
-                  <p class="font-semibold text-slate-800 truncate">{{ cand.full_name }}</p>
-                  <p class="text-[11px] text-slate-500 truncate">
-                    Batch {{ cand.batch_year || 'N/A' }} - {{ cand.campus_chapter || 'Campus/Chapter not set' }}
-                  </p>
+                <div class="flex flex-col items-center gap-2 mt-1">
+                  <span class="text-xs text-slate-700 font-semibold whitespace-nowrap">{{ cand.votes }} vote(s)</span>
+                  <div class="w-8 h-[180px] rounded-lg overflow-hidden border border-[rgba(196,151,60,0.5)] bg-slate-100 flex items-end">
+                    <div
+                      class="w-full bg-gradient-to-b from-[var(--hcad-navy)] to-[var(--hcad-gold)]"
+                      :style="{
+                        height: Math.max(14, ((cand.votes || 0) / maxTallyVotes) * 180) + 'px'
+                      }"
+                    ></div>
+                  </div>
                 </div>
               </div>
-              <span class="font-semibold text-slate-700 text-xs px-2 py-0.5 rounded-full bg-white border border-slate-200">
-                {{ cand.votes }} vote(s)
-              </span>
-            </div>
-            <div class="h-2.5 rounded-full bg-slate-100 overflow-hidden">
-              <div
-                class="h-full rounded-full bg-gradient-to-r from-[var(--hcad-gold)] to-[var(--hcad-navy)] transition-all duration-300"
-                :style="{
-                  width:
-                    (Math.max(...activeTally.candidates.map((c) => c.votes), 1)
-                      ? (cand.votes / Math.max(...activeTally.candidates.map((c) => c.votes), 1)) * 100
-                      : 0) + '%',
-                }"
-              ></div>
-            </div>
-            <div class="pt-1">
-              <div class="flex flex-wrap gap-2 items-center">
+              <div>
+                <p class="text-xl font-semibold text-slate-900 leading-tight">{{ cand.full_name }}</p>
+                <p class="text-sm text-slate-600">Batch {{ cand.batch_year || 'N/A' }}</p>
+                <p class="text-xs text-slate-500"> {{ cand.campus_chapter || 'Campus/Chapter not set' }}</p>
+              </div>
+              <div class="flex flex-wrap gap-2 items-center pt-1">
                 <label
                   class="inline-flex items-center gap-2 text-[11px] font-semibold text-[var(--hcad-navy)] cursor-pointer"
                   :class="{ 'opacity-60 cursor-not-allowed': candidatePhotoUploading[cand.candidate_id] }"
@@ -777,6 +775,7 @@ onUnmounted(() => {
             </div>
           </div>
         </div>
+        <p v-else class="text-sm text-slate-600">No candidates for this position.</p>
       </div>
       <p v-else class="text-sm text-slate-600">No positions to display.</p>
 

@@ -8,7 +8,7 @@ from django.conf import settings
 from django.core.mail import send_mail
 from django.conf import settings
 from django.db import transaction
-from django.db.models import Q
+from django.db.models import Q, Count
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes
@@ -250,12 +250,16 @@ def candidates_list(request):
     election = get_active_election()
     if not election:
         return Response([], status=200)
-    qs = Candidate.objects.filter(position__election=election, is_official=True)
+    qs = Candidate.objects.filter(position__election=election, is_official=True).annotate(votes_count=Count("votes"))
     position_id = request.query_params.get("position")
     if position_id:
         qs = qs.filter(position_id=position_id)
     qs = qs.order_by("position__display_order", "full_name")
-    return Response(CandidateSerializer(qs, many=True, context={"request": request}).data)
+    data = CandidateSerializer(qs, many=True, context={"request": request}).data
+    # Attach vote counts so voter list aligns with admin tally
+    for idx, cand in enumerate(qs):
+        data[idx]["votes"] = cand.votes_count
+    return Response(data)
 
 
 @api_view(["GET"])
