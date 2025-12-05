@@ -54,6 +54,9 @@ const notificationsLoading = ref(false)
 const notificationsError = ref('')
 const notificationsCollapsed = ref(false)
 const showHistory = ref(false)
+const candidatePhotoUploading = ref({})
+const candidatePlaceholder =
+  "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='80' height='80' viewBox='0 0 80 80'><rect width='80' height='80' rx='40' fill='%23dfe4ea'/><path d='M40 40a12 12 0 1 0-0.001-24.001A12 12 0 0 0 40 40zm0 8c-11.046 0-20 6.268-20 14v4h40v-4c0-7.732-8.954-14-20-14z' fill='%2390a4ae'/></svg>"
 const voterSearch = ref('')
 
 // Voters
@@ -151,6 +154,35 @@ const loadStats = async () => {
 const loadTally = async () => {
   const res = await api.get('admin/tally/')
   tally.value = res.data || []
+}
+
+const uploadCandidatePhoto = async (candidateId, file) => {
+  if (!file) return
+  candidatePhotoUploading.value = { ...candidatePhotoUploading.value, [candidateId]: true }
+  try {
+    const form = new FormData()
+    form.append('photo', file)
+    await api.post(`admin/candidates/${candidateId}/photo/`, form, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
+    await loadTally()
+  } catch (err) {
+    alert(err.response?.data?.error || 'Failed to upload photo.')
+  } finally {
+    candidatePhotoUploading.value = { ...candidatePhotoUploading.value, [candidateId]: false }
+  }
+}
+
+const removeCandidatePhoto = async (candidateId) => {
+  candidatePhotoUploading.value = { ...candidatePhotoUploading.value, [candidateId]: true }
+  try {
+    await api.delete(`admin/candidates/${candidateId}/photo/`)
+    await loadTally()
+  } catch (err) {
+    alert(err.response?.data?.error || 'Failed to remove photo.')
+  } finally {
+    candidatePhotoUploading.value = { ...candidatePhotoUploading.value, [candidateId]: false }
+  }
 }
 
 watch(
@@ -682,19 +714,66 @@ onUnmounted(() => {
             <span class="text-[11px] text-slate-500">{{ activeTally.candidates.length }} candidate(s)</span>
           </div>
         </div>
-        <div class="space-y-2">
-          <div v-for="cand in activeTally.candidates" :key="cand.candidate_id" class="text-sm rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
-            <div class="flex justify-between mb-1 items-center gap-2">
-              <span class="font-semibold text-slate-800">{{ cand.full_name }}</span>
-              <span class="font-semibold text-slate-700 text-xs px-2 py-0.5 rounded-full bg-white border border-slate-200">{{ cand.votes }} vote(s)</span>
+        <div class="space-y-3">
+          <div
+            v-for="cand in activeTally.candidates"
+            :key="cand.candidate_id"
+            class="text-sm rounded-lg border border-slate-200 bg-slate-50 px-3 py-3 space-y-2"
+          >
+            <div class="flex items-center justify-between gap-3 flex-wrap">
+              <div class="flex items-center gap-3 min-w-0">
+                <div class="h-14 w-14 rounded-xl border border-slate-200 bg-white overflow-hidden flex items-center justify-center">
+                  <img :src="cand.photo_url || candidatePlaceholder" alt="Candidate photo" class="h-full w-full object-cover" />
+                </div>
+                <div class="min-w-0">
+                  <p class="font-semibold text-slate-800 truncate">{{ cand.full_name }}</p>
+                  <p class="text-[11px] text-slate-500 truncate">
+                    Batch {{ cand.batch_year || 'N/A' }} - {{ cand.campus_chapter || 'Campus/Chapter not set' }}
+                  </p>
+                </div>
+              </div>
+              <span class="font-semibold text-slate-700 text-xs px-2 py-0.5 rounded-full bg-white border border-slate-200">
+                {{ cand.votes }} vote(s)
+              </span>
             </div>
             <div class="h-2.5 rounded-full bg-slate-100 overflow-hidden">
               <div
                 class="h-full rounded-full bg-gradient-to-r from-[var(--hcad-gold)] to-[var(--hcad-navy)] transition-all duration-300"
                 :style="{
-                  width: (Math.max(...activeTally.candidates.map(c => c.votes), 1) ? (cand.votes / Math.max(...activeTally.candidates.map(c => c.votes), 1)) * 100 : 0) + '%'
+                  width:
+                    (Math.max(...activeTally.candidates.map((c) => c.votes), 1)
+                      ? (cand.votes / Math.max(...activeTally.candidates.map((c) => c.votes), 1)) * 100
+                      : 0) + '%',
                 }"
               ></div>
+            </div>
+            <div class="pt-1">
+              <div class="flex flex-wrap gap-2 items-center">
+                <label
+                  class="inline-flex items-center gap-2 text-[11px] font-semibold text-[var(--hcad-navy)] cursor-pointer"
+                  :class="{ 'opacity-60 cursor-not-allowed': candidatePhotoUploading[cand.candidate_id] }"
+                >
+                  <input
+                    type="file"
+                    accept="image/*"
+                    class="hidden"
+                    :disabled="candidatePhotoUploading[cand.candidate_id]"
+                    @change="(e) => { const file = e.target.files?.[0]; if (file) uploadCandidatePhoto(cand.candidate_id, file); e.target.value = '' }"
+                  />
+                  <span class="px-2 py-1 rounded-full border border-[rgba(196,151,60,0.45)] bg-white hover:bg-[rgba(196,151,60,0.12)] transition">
+                    {{ candidatePhotoUploading[cand.candidate_id] ? 'Uploading…' : cand.photo_url ? 'Change photo' : 'Add photo' }}
+                  </span>
+                </label>
+                <button
+                  v-if="cand.photo_url"
+                  type="button"
+                  class="text-[11px] px-2 py-1 rounded-full border border-rose-200 text-rose-700 bg-rose-50 hover:bg-rose-100 transition"
+                  :disabled="candidatePhotoUploading[cand.candidate_id]"
+                  @click="removeCandidatePhoto(cand.candidate_id)"
+                >
+                  Remove photo
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -1092,4 +1171,3 @@ onUnmounted(() => {
   outline: none;
 }
 </style>
-

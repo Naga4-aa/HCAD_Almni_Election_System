@@ -255,7 +255,7 @@ def candidates_list(request):
     if position_id:
         qs = qs.filter(position_id=position_id)
     qs = qs.order_by("position__display_order", "full_name")
-    return Response(CandidateSerializer(qs, many=True).data)
+    return Response(CandidateSerializer(qs, many=True, context={"request": request}).data)
 
 
 @api_view(["GET"])
@@ -289,6 +289,7 @@ def published_results(request):
                     "full_name": cand.full_name,
                     "batch_year": cand.batch_year,
                     "campus_chapter": cand.campus_chapter,
+                    "photo_url": request.build_absolute_uri(cand.photo.url) if cand.photo else None,
                     "votes": votes_count,
                 }
             )
@@ -615,6 +616,9 @@ def admin_tally(request):
                 {
                     "candidate_id": cand.id,
                     "full_name": cand.full_name,
+                    "batch_year": cand.batch_year,
+                    "campus_chapter": cand.campus_chapter,
+                    "photo_url": request.build_absolute_uri(cand.photo.url) if cand.photo else None,
                     "votes": votes_count,
                 }
             )
@@ -689,6 +693,10 @@ def admin_promote_nomination(request, nomination_id):
                 "is_official": True,
             },
         )
+        # If the candidate already exists without a photo, use the nominee photo to help admin.
+        if (not created) and (not candidate.photo) and nomination.nominee_photo:
+            candidate.photo = nomination.nominee_photo
+            candidate.save(update_fields=["photo"])
         nomination.promoted = True
         nomination.promoted_at = timezone.now()
         nomination.status = "promoted"
@@ -701,9 +709,34 @@ def admin_promote_nomination(request, nomination_id):
         )
 
     return Response({
-        "candidate": CandidateSerializer(candidate).data,
+        "candidate": CandidateSerializer(candidate, context={"request": request}).data,
         "created": created,
     })
+
+
+@api_view(["POST", "DELETE"])
+def admin_candidate_photo(request, candidate_id):
+    admin = get_admin_from_request(request)
+    if not admin:
+        return Response({"error": "Admin authentication required"}, status=403)
+
+    try:
+        candidate = Candidate.objects.get(id=candidate_id, is_official=True)
+    except Candidate.DoesNotExist:
+        return Response({"error": "Candidate not found"}, status=404)
+
+    if request.method == "DELETE":
+        candidate.photo = None
+        candidate.save(update_fields=["photo"])
+        return Response(CandidateSerializer(candidate, context={"request": request}).data)
+
+    if "photo" not in request.FILES:
+        return Response({"error": "No photo uploaded"}, status=400)
+
+    candidate.photo = request.FILES["photo"]
+    candidate.save(update_fields=["photo"])
+
+    return Response(CandidateSerializer(candidate, context={"request": request}).data)
 
 
 @api_view(["POST"])

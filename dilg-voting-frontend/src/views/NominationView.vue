@@ -31,6 +31,8 @@ const errorMessage = ref('')
 const loading = ref(false)
 const submitting = ref(false)
 const lastElectionId = ref(null)
+const candidatePlaceholder =
+  "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='80' height='80' viewBox='0 0 80 80'><rect width='80' height='80' rx='40' fill='%23dfe4ea'/><path d='M40 40a12 12 0 1 0-0.001-24.001A12 12 0 0 0 40 40zm0 8c-11.046 0-20 6.268-20 14v4h40v-4c0-7.732-8.954-14-20-14z' fill='%2390a4ae'/></svg>"
 const candidateTab = ref(null)
 const activeCandidatePosition = computed(() => {
   return positions.value.find((p) => p.id === candidateTab.value) || null
@@ -330,9 +332,9 @@ const refreshElectionData = async () => {
       await loadPositions()
       await loadCandidates()
       await loadMyNomination()
-    }
-    // Always refresh nomination status so banner/form reflect latest decisions
-    if (!changed) {
+    } else {
+      // Keep candidates (and their photos) fresh even when timeline is unchanged
+      await loadCandidates()
       await loadMyNomination()
     }
   } catch (err) {
@@ -466,10 +468,17 @@ onUnmounted(() => {
                   :key="cand.id"
                   class="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2"
                 >
-                  <p class="text-sm font-semibold text-slate-800">{{ cand.full_name }}</p>
-                  <p class="text-[11px] text-slate-500">
-                    Batch {{ cand.batch_year || 'N/A' }} - {{ cand.campus_chapter || 'Chapter not set' }}
-                  </p>
+                  <div class="flex items-center gap-3">
+                    <div class="h-10 w-10 rounded-full border border-slate-200 bg-white overflow-hidden flex-shrink-0">
+                      <img :src="cand.photo_url || candidatePlaceholder" alt="Candidate" class="h-full w-full object-cover" />
+                    </div>
+                    <div class="flex-1 min-w-0">
+                      <p class="text-sm font-semibold text-slate-800 truncate">{{ cand.full_name }}</p>
+                      <p class="text-[11px] text-slate-500">
+                        Batch {{ cand.batch_year || 'N/A' }} - {{ cand.campus_chapter || 'Chapter not set' }}
+                      </p>
+                    </div>
+                  </div>
                 </div>
               </div>
               <p v-else class="text-[11px] text-slate-500">No official candidates yet for this position.</p>

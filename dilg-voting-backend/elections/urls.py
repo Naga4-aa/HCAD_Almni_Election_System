@@ -38,6 +38,7 @@ urlpatterns = [
     path("admin/notifications/", views.admin_notifications),
     path("admin/reset-voters/", views.admin_reset_voters),
     path("admin/reset-election/", views.admin_reset_election),
+    path("admin/candidates/<int:candidate_id>/photo/", views.admin_candidate_photo),
 
     # Voter notifications
     path("notifications/", views.voter_notifications),

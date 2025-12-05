@@ -9,6 +9,8 @@ const election = ref(null)
 const loading = ref(true)
 const error = ref('')
 const now = ref(Date.now())
+const candidatePlaceholder =
+  "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='80' height='80' viewBox='0 0 80 80'><rect width='80' height='80' rx='40' fill='%23dfe4ea'/><path d='M40 40a12 12 0 1 0-0.001-24.001A12 12 0 0 0 40 40zm0 8c-11.046 0-20 6.268-20 14v4h40v-4c0-7.732-8.954-14-20-14z' fill='%2390a4ae'/></svg>"
 
 const hasActiveElection = computed(() => !!election.value && election.value.is_active)
 const hasTimeline = computed(() => {
@@ -51,9 +53,9 @@ watch(
   { immediate: true },
 )
 
-const loadResults = async () => {
-  loading.value = true
-  error.value = ''
+const loadResults = async (opts = {}) => {
+  const silent = opts.silent
+  if (!silent) loading.value = true
   try {
     const res = await api.get('elections/results/')
     if (res.data?.published) {
@@ -64,7 +66,7 @@ const loadResults = async () => {
   } catch (err) {
     error.value = err.response?.data?.error || 'Failed to load results.'
   } finally {
-    loading.value = false
+    if (!silent) loading.value = false
   }
 }
 
@@ -85,7 +87,7 @@ const tick = async () => {
   if (refreshing) return
   refreshing = true
   try {
-    await Promise.all([loadResults(), loadElection()])
+    await Promise.all([loadResults({ silent: true }), loadElection()])
   } catch (e) {
     // ignore transient refresh errors
   } finally {
@@ -164,16 +166,21 @@ onUnmounted(() => {
             :key="cand.id"
             class="space-y-1"
           >
-            <div class="flex items-center justify-between">
-              <div>
-                <p class="font-semibold" :class="{ 'text-emerald-700': cand.winner }">{{ cand.full_name }}</p>
-                <p class="text-[11px] text-slate-500">
-                  Batch {{ cand.batch_year }} - {{ cand.campus_chapter || 'Campus/Chapter not set' }}
-                </p>
+            <div class="flex items-center justify-between gap-3">
+              <div class="flex items-center gap-3 min-w-0">
+                <div class="h-10 w-10 rounded-full border border-slate-200 bg-white overflow-hidden flex-shrink-0">
+                  <img :src="cand.photo_url || candidatePlaceholder" alt="Candidate photo" class="h-full w-full object-cover" />
+                </div>
+                <div class="min-w-0">
+                  <p class="font-semibold truncate" :class="{ 'text-[var(--hcad-navy)]': cand.winner }">{{ cand.full_name }}</p>
+                  <p class="text-[11px] text-slate-500">
+                    Batch {{ cand.batch_year }} - {{ cand.campus_chapter || 'Campus/Chapter not set' }}
+                  </p>
+                </div>
               </div>
-              <div class="text-right">
+              <div class="text-right flex-shrink-0">
                 <p class="text-sm font-semibold text-slate-800">{{ cand.votes }} vote(s)</p>
-                <p v-if="cand.winner" class="text-[11px] text-emerald-700 font-semibold">Winner</p>
+                <p v-if="cand.winner" class="text-[11px] text-[var(--hcad-navy)] font-semibold">Winner</p>
               </div>
             </div>
             <div class="h-2.5 rounded-full bg-slate-100 overflow-hidden">

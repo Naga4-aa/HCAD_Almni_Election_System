@@ -11,6 +11,8 @@ const election = ref(null)
 const positions = ref([])
 const candidatesByPosition = ref({})
 const selections = ref({})
+const candidatePlaceholder =
+  "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='80' height='80' viewBox='0 0 80 80'><rect width='80' height='80' rx='40' fill='%23dfe4ea'/><path d='M40 40a12 12 0 1 0-0.001-24.001A12 12 0 0 0 40 40zm0 8c-11.046 0-20 6.268-20 14v4h40v-4c0-7.732-8.954-14-20-14z' fill='%2390a4ae'/></svg>"
 const hasVoted = ref(false)
 const loading = ref(false)
 const submitting = ref(false)
@@ -262,6 +264,9 @@ const tick = async () => {
       await loadAllCandidates()
       await loadMyVotes()
       restoreDraft()
+    } else {
+      // Refresh candidates periodically so new photos/bios from admins appear without manual reload.
+      await loadAllCandidates()
     }
   } catch (e) {
     // ignore transient errors on poll
@@ -358,9 +363,9 @@ watch(
           <label
             v-for="cand in candidatesByPosition[pos.id] || []"
             :key="cand.id"
-            class="border rounded-xl p-3 flex gap-3 cursor-pointer hover:border-emerald-500"
+            class="border rounded-xl p-3 flex gap-3 cursor-pointer hover:border-[rgba(196,151,60,0.6)]"
             :class="{
-              'border-emerald-600 bg-emerald-50': selections[pos.id] === cand.id,
+              'border-[var(--hcad-gold)] bg-[rgba(196,151,60,0.12)]': selections[pos.id] === cand.id,
               'opacity-60 pointer-events-none': hasVoted,
             }"
           >
@@ -372,10 +377,15 @@ watch(
               v-model="selections[pos.id]"
               :disabled="hasVoted || !votingOpen"
             />
-            <div>
-              <p class="text-sm font-semibold">{{ cand.full_name }}</p>
-              <p class="text-[11px] text-slate-500">Batch {{ cand.batch_year }} - {{ cand.campus_chapter || 'Campus/Chapter not set' }}</p>
-              <p class="text-[11px] text-slate-600 mt-1 whitespace-pre-line">{{ cand.bio || 'No bio provided' }}</p>
+            <div class="flex gap-3 items-start w-full">
+              <div class="h-10 w-10 rounded-full border border-slate-200 bg-white overflow-hidden flex-shrink-0">
+                <img :src="cand.photo_url || candidatePlaceholder" alt="Candidate photo" class="h-full w-full object-cover" />
+              </div>
+              <div class="flex-1 min-w-0">
+                <p class="text-sm font-semibold truncate">{{ cand.full_name }}</p>
+                <p class="text-[11px] text-slate-500">Batch {{ cand.batch_year }} - {{ cand.campus_chapter || 'Campus/Chapter not set' }}</p>
+                <p class="text-[11px] text-slate-600 mt-1 whitespace-pre-line">{{ cand.bio || 'No bio provided' }}</p>
+              </div>
             </div>
           </label>
         </div>

@@ -54,6 +54,7 @@ class PositionSerializer(serializers.ModelSerializer):
 
 class CandidateSerializer(serializers.ModelSerializer):
     position_name = serializers.CharField(source="position.get_name_display", read_only=True)
+    photo_url = serializers.SerializerMethodField()
 
     class Meta:
         model = Candidate
@@ -68,9 +69,17 @@ class CandidateSerializer(serializers.ModelSerializer):
             "contact_phone",
             "bio",
             "photo",
+            "photo_url",
             "is_official",
             "source_nomination",
         ]
+
+    def get_photo_url(self, obj):
+        if not obj.photo:
+            return None
+        request = self.context.get("request") if hasattr(self, "context") else None
+        url = obj.photo.url
+        return request.build_absolute_uri(url) if request else url
 
 
 class VoterSerializer(serializers.ModelSerializer):
