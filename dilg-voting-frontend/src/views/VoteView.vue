@@ -242,6 +242,7 @@ const submitBallot = async () => {
 }
 
 let timerId
+let countdownTimer
 let refreshingElection = false
 
 const tick = async () => {
@@ -290,11 +291,15 @@ onMounted(async () => {
   } finally {
     loading.value = false
   }
+  countdownTimer = setInterval(() => {
+    now.value = Date.now()
+  }, 1000)
   timerId = setInterval(tick, 15000)
 })
 
 onUnmounted(() => {
   if (timerId) clearInterval(timerId)
+  if (countdownTimer) clearInterval(countdownTimer)
 })
 
 watch(

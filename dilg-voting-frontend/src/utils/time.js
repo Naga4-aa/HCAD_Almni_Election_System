@@ -6,17 +6,20 @@ export function toMs(value) {
   return Number.isNaN(ts) ? null : ts
 }
 
-// Format a remaining duration in a short "Xd Yh Zm" form.
+// Format a remaining duration with seconds (e.g., "1d 2h 03m 12s").
 export function formatDuration(ms) {
   const abs = Math.max(0, Math.trunc(ms))
-  const minutesTotal = Math.floor(abs / 60000)
-  const days = Math.floor(minutesTotal / (60 * 24))
-  const hours = Math.floor((minutesTotal % (60 * 24)) / 60)
-  const minutes = minutesTotal % 60
+  const totalSeconds = Math.floor(abs / 1000)
+  const days = Math.floor(totalSeconds / 86400)
+  const hours = Math.floor((totalSeconds % 86400) / 3600)
+  const minutes = Math.floor((totalSeconds % 3600) / 60)
+  const seconds = totalSeconds % 60
+
   const parts = []
   if (days) parts.push(`${days}d`)
   if (days || hours) parts.push(`${hours}h`)
-  parts.push(`${minutes}m`)
+  if (days || hours || minutes) parts.push(`${minutes.toString().padStart(2, '0')}m`)
+  parts.push(`${seconds.toString().padStart(2, '0')}s`)
   return parts.join(' ')
 }
 

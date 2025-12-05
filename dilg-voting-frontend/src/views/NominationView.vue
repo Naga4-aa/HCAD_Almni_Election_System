@@ -362,7 +362,7 @@ onMounted(async () => {
   // Keep countdown ticking without disrupting form scroll position
   timerId = setInterval(() => {
     now.value = Date.now()
-  }, 15000)
+  }, 1000)
   refreshTimerId = setInterval(refreshElectionData, 10000)
   loadVoterNotifications()
   startVoterNotifPolling()
