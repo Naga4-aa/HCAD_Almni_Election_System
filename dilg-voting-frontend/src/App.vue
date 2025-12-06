@@ -287,7 +287,7 @@ watch(
               {{ isAdminContext ? 'HCAD Admin Console' : 'HCAD Alumni Election System' }}
             </p>
             <p class="text-[11px] text-slate-500">
-              {{ isAdminContext ? 'COMELEC / Staff access' : 'Holy Cross Academy of Digos Alumni Association' }}
+              {{ isAdminContext ? 'COMELEC / Staff access' : 'Holy Cross Academy of Digos Alumni Association Incorporated' }}
             </p>
           </div>
         </div>
@@ -318,6 +318,7 @@ watch(
                 v-if="headerNotifOpen"
                 class="absolute right-0 mt-3 rounded-2xl border border-slate-200 bg-white shadow-2xl backdrop-blur p-3 z-50 ring-1 ring-slate-100"
                 :class="headerNotifExpanded ? 'w-[28rem] max-w-[28rem]' : 'w-80 max-w-xs sm:max-w-sm'"
+                style="max-width: min(90vw, 28rem);"
               >
                 <div class="flex items-start justify-between gap-2">
                   <div>
