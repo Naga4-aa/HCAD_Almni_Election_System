@@ -397,125 +397,6 @@ onUnmounted(() => {
         </div>
       </div>
 
-      <div class="rounded-2xl bg-gradient-to-br from-[rgba(196,151,60,0.12)] via-white to-[rgba(15,35,66,0.05)] border border-[rgba(196,151,60,0.35)] shadow-inner p-3 sm:p-4 space-y-3">
-        <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <div class="flex items-center gap-2">
-            <span class="inline-flex items-center justify-center rounded-full text-[var(--hcad-navy)] text-[11px] font-semibold px-2 py-1 border border-[rgba(196,151,60,0.6)] bg-gradient-to-r from-[rgba(196,151,60,0.18)] to-[rgba(15,35,66,0.08)]">
-              Current candidates
-            </span>
-            <p class="text-[11px] text-slate-600">Official nominees already in the tally, by position.</p>
-          </div>
-          <button
-            @click="loadCandidates"
-            :disabled="candidatesLoading"
-            class="self-start text-xs px-3 py-1.5 rounded-lg border border-[rgba(196,151,60,0.5)] bg-white text-[var(--hcad-navy)] hover:bg-[rgba(196,151,60,0.1)] disabled:opacity-60 shadow-sm"
-          >
-            {{ candidatesLoading ? 'Refreshing...' : 'Refresh list' }}
-          </button>
-        </div>
-        <div class="bg-amber-50 border border-amber-200 rounded-xl p-3 space-y-1 text-[11px] text-slate-700" v-if="voterNotifications.length">
-          <div class="flex items-center justify-between">
-            <p class="font-semibold text-slate-800">Updates</p>
-            <button
-              class="text-[11px] px-2 py-1 rounded-lg border border-slate-300 hover:bg-slate-100"
-              @click="markVoterNotificationsRead"
-              :disabled="voterNotifLoading || voterUnread === 0"
-            >
-              Mark read
-            </button>
-          </div>
-          <div class="max-h-32 overflow-y-auto space-y-2">
-            <div
-              v-for="n in voterNotifications"
-              :key="n.id"
-              class="rounded-lg border border-slate-200 bg-white/80 px-3 py-2"
-              :class="n.is_read ? 'opacity-70' : ''"
-            >
-              <p class="text-[11px] text-slate-800">{{ n.message }}</p>
-              <p class="text-[10px] text-slate-500">{{ new Date(n.created_at).toLocaleString() }}</p>
-            </div>
-          </div>
-        </div>
-        <p v-if="candidatesError" class="text-xs text-rose-600">{{ candidatesError }}</p>
-        <p v-else-if="candidatesLoading" class="text-xs text-slate-600">Loading candidate list...</p>
-        <div v-else>
-          <div class="flex flex-wrap gap-2 mb-3">
-            <button
-              v-for="p in positions"
-              :key="p.id"
-              class="px-3 py-1.5 rounded-lg text-xs border"
-              :class="candidateTab === p.id ? 'bg-[var(--hcad-navy)] text-white border-[var(--hcad-navy)] shadow-sm' : 'border-[rgba(196,151,60,0.5)] bg-white hover:bg-[rgba(196,151,60,0.12)]'"
-              @click="candidateTab = p.id"
-            >
-              {{ p.name_display || p.name }}
-            </button>
-          </div>
-          <div
-            v-if="activeCandidatePosition"
-            class="rounded-xl border border-emerald-100 bg-white/90 p-3 space-y-2 shadow-sm"
-          >
-            <div class="space-y-2">
-              <div class="flex items-start justify-between gap-2">
-                <div>
-                  <p class="text-sm font-semibold text-slate-800">{{ activeCandidatePosition.name_display || activeCandidatePosition.name }}</p>
-                  <p class="text-[11px] text-slate-500">
-                    {{ activeCandidates.length }} candidate(s)
-                  </p>
-                </div>
-              </div>
-              <div v-if="activeCandidates.length" class="overflow-x-auto">
-                <div class="flex gap-6 pb-2 min-h-[320px]">
-                  <div
-                    v-for="cand in activeCandidates"
-                    :key="cand.id"
-                    class="bg-white border border-[rgba(196,151,60,0.35)] rounded-2xl shadow-sm p-4 flex flex-col gap-3 min-w-[320px]"
-                  >
-                    <div class="flex items-start gap-4">
-                      <div class="rounded-xl overflow-hidden bg-slate-100 border border-slate-200 h-[220px] w-[220px] flex-shrink-0">
-                        <img :src="cand.photo_url || candidatePlaceholder" alt="Candidate" class="h-full w-full object-cover" />
-                      </div>
-                      <div class="flex flex-col items-center gap-2 mt-1">
-                        <span class="text-xs text-slate-700 font-semibold whitespace-nowrap">{{ (cand.votes || 0) }} vote(s)</span>
-                        <div class="w-8 h-[180px] rounded-lg overflow-hidden border border-[rgba(196,151,60,0.5)] bg-slate-100 flex items-end">
-                          <div
-                            class="w-full bg-gradient-to-b from-[var(--hcad-navy)] to-[var(--hcad-gold)]"
-                            :style="{
-                              height: Math.max(14, ((cand.votes || 0) / maxCandidateVotes) * 180) + 'px'
-                            }"
-                          ></div>
-                        </div>
-                      </div>
-                    </div>
-                    <div>
-                      <p class="text-xl font-semibold text-slate-900 leading-tight">{{ cand.full_name }}</p>
-                      <p class="text-sm text-slate-600">Batch {{ cand.batch_year || 'N/A' }}</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              <p v-else class="text-[11px] text-slate-500">No official candidates yet for this position.</p>
-            </div>
-          </div>
-          <p v-else class="text-xs text-slate-600">No positions available.</p>
-        </div>
-      </div>
-
-      <p v-if="myNomination" class="text-sm bg-[rgba(196,151,60,0.08)] border border-[rgba(196,151,60,0.35)] rounded-xl p-3" :class="myNomination.status === 'rejected' ? 'text-amber-700' : 'text-[var(--hcad-navy)]'">
-        <span v-if="myNomination.status === 'promoted'">
-          Your nomination of <span class="font-semibold">{{ myNomination.nominee_full_name }}</span> for {{ myNomination.position_name }} was promoted. Thank you!
-        </span>
-        <span v-else-if="myNomination.status === 'pending'">
-          Your nomination of <span class="font-semibold">{{ myNomination.nominee_full_name }}</span> for {{ myNomination.position_name }} is pending admin review.
-        </span>
-        <span v-else-if="myNomination.status === 'rejected'">
-          Your nomination was rejected. Reason: <span class="font-semibold">{{ myNomination.rejection_reason || 'Not provided' }}</span>.
-          You may submit a new nomination now.
-        </span>
-        <span v-else>
-          You already nominated <span class="font-semibold">{{ myNomination.nominee_full_name }}</span> for {{ myNomination.position_name }}.
-        </span>
-      </p>
-
       <div v-if="!hasActiveElection" class="text-sm text-slate-600 bg-slate-50 border border-slate-200 rounded-xl p-3">
         No active election. Please wait for the admin to reopen nominations.
       </div>
@@ -524,126 +405,263 @@ onUnmounted(() => {
         Timeline not set. Waiting for admin to provide dates.
       </div>
 
-      <div v-else-if="showNominationForm && canSubmitNomination" class="grid gap-3 md:grid-cols-2 border border-slate-200 rounded-2xl p-3 sm:p-4 bg-white/90">
+      <div v-else class="grid gap-4 lg:grid-cols-[1.05fr_0.95fr] items-start">
+        <!-- Left: Candidates / tally -->
         <div class="space-y-3">
-          <div>
-            <label class="text-xs font-semibold text-slate-700">Position</label>
-            <select
-              v-model="form.position_id"
-              class="mt-1 w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"
-              :disabled="!isNominationOpen || !canSubmitNomination"
-            >
-              <option value="">-- Select position --</option>
-              <option v-for="p in positions" :key="p.id" :value="p.id">{{ p.name_display || p.name }}</option>
-            </select>
-          </div>
+          <div class="rounded-2xl bg-gradient-to-br from-[rgba(196,151,60,0.12)] via-white to-[rgba(15,35,66,0.05)] border border-[rgba(196,151,60,0.35)] shadow-inner p-3 sm:p-4 space-y-3">
+            <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <div class="flex items-center gap-2">
+                <span class="inline-flex items-center justify-center rounded-full text-[var(--hcad-navy)] text-[11px] font-semibold px-2 py-1 border border-[rgba(196,151,60,0.6)] bg-gradient-to-r from-[rgba(196,151,60,0.18)] to-[rgba(15,35,66,0.08)]">
+                  Current candidates
+                </span>
+                <p class="text-[11px] text-slate-600">Official nominees already in the tally, by position.</p>
+              </div>
+              <button
+                @click="loadCandidates"
+                :disabled="candidatesLoading"
+                class="self-start text-xs px-3 py-1.5 rounded-lg border border-[rgba(196,151,60,0.5)] bg-white text-[var(--hcad-navy)] hover:bg-[rgba(196,151,60,0.1)] disabled:opacity-60 shadow-sm"
+              >
+                {{ candidatesLoading ? 'Refreshing...' : 'Refresh list' }}
+              </button>
+            </div>
 
-          <div>
-            <label class="text-xs font-semibold text-slate-700">Nominee full name</label>
-            <input
-              v-model="form.nominee_full_name"
-              type="text"
-              class="mt-1 w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"
-              placeholder="e.g. Juan Dela Cruz"
-              :disabled="!isNominationOpen || !canSubmitNomination"
-            />
-          </div>
+            <div class="bg-amber-50 border border-amber-200 rounded-xl p-3 space-y-1 text-[11px] text-slate-700" v-if="voterNotifications.length">
+              <div class="flex items-center justify-between">
+                <p class="font-semibold text-slate-800">Updates</p>
+                <button
+                  class="text-[11px] px-2 py-1 rounded-lg border border-slate-300 hover:bg-slate-100"
+                  @click="markVoterNotificationsRead"
+                  :disabled="voterNotifLoading || voterUnread === 0"
+                >
+                  Mark read
+                </button>
+              </div>
+              <div class="max-h-32 overflow-y-auto space-y-2">
+                <div
+                  v-for="n in voterNotifications"
+                  :key="n.id"
+                  class="rounded-lg border border-slate-200 bg-white/80 px-3 py-2"
+                  :class="n.is_read ? 'opacity-70' : ''"
+                >
+                  <p class="text-[11px] text-slate-800">{{ n.message }}</p>
+                  <p class="text-[10px] text-slate-500">{{ new Date(n.created_at).toLocaleString() }}</p>
+                </div>
+              </div>
+            </div>
 
-          <div class="grid gap-3 sm:grid-cols-2">
-            <div>
-              <label class="text-xs font-semibold text-slate-700">Batch / Year</label>
-              <input
-              v-model="form.nominee_batch_year"
-              type="number"
-              class="mt-1 w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"
-              placeholder="1998"
-              :disabled="!isNominationOpen || !canSubmitNomination"
-            />
-          </div>
-          <div>
-            <label class="text-xs font-semibold text-slate-700">Campus / Chapter</label>
-            <input
-              v-model="form.nominee_campus_chapter"
-              type="text"
-              class="mt-1 w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"
-              placeholder="Main Campus / Digos / etc"
-              :disabled="!isNominationOpen || !canSubmitNomination"
-            />
+            <p v-if="candidatesError" class="text-xs text-rose-600">{{ candidatesError }}</p>
+            <p v-else-if="candidatesLoading" class="text-xs text-slate-600">Loading candidate list...</p>
+            <div v-else>
+              <div class="flex flex-wrap gap-2 mb-3">
+                <button
+                  v-for="p in positions"
+                  :key="p.id"
+                  class="px-3 py-1.5 rounded-lg text-xs border"
+                  :class="candidateTab === p.id ? 'bg-[var(--hcad-navy)] text-white border-[var(--hcad-navy)] shadow-sm' : 'border-[rgba(196,151,60,0.5)] bg-white hover:bg-[rgba(196,151,60,0.12)]'"
+                  @click="candidateTab = p.id"
+                >
+                  {{ p.name_display || p.name }}
+                </button>
+              </div>
+
+              <div
+                v-if="activeCandidatePosition"
+                class="rounded-xl border border-emerald-100 bg-white/90 p-3 space-y-2 shadow-sm"
+              >
+                <div class="space-y-2">
+                  <div class="flex items-start justify-between gap-2">
+                    <div>
+                      <p class="text-sm font-semibold text-slate-800">{{ activeCandidatePosition.name_display || activeCandidatePosition.name }}</p>
+                      <p class="text-[11px] text-slate-500">
+                        {{ activeCandidates.length }} candidate(s)
+                      </p>
+                    </div>
+                  </div>
+
+                  <div v-if="activeCandidates.length" class="overflow-x-auto">
+                    <div class="flex gap-6 pb-2 min-h-[320px]">
+                      <div
+                        v-for="cand in activeCandidates"
+                        :key="cand.id"
+                        class="bg-white border border-[rgba(196,151,60,0.35)] rounded-2xl shadow-sm p-4 flex flex-col gap-3 min-w-[320px]"
+                      >
+                        <div class="flex items-start gap-4">
+                          <div class="rounded-xl overflow-hidden bg-slate-100 border border-slate-200 h-[220px] w-[220px] flex-shrink-0">
+                            <img :src="cand.photo_url || candidatePlaceholder" alt="Candidate" class="h-full w-full object-cover" />
+                          </div>
+                          <div class="flex flex-col items-center gap-2 mt-1">
+                            <span class="text-xs text-slate-700 font-semibold whitespace-nowrap">{{ (cand.votes || 0) }} vote(s)</span>
+                            <div class="w-8 h-[180px] rounded-lg overflow-hidden border border-[rgba(196,151,60,0.5)] bg-slate-100 flex items-end">
+                              <div
+                                class="w-full bg-gradient-to-b from-[var(--hcad-navy)] to-[var(--hcad-gold)]"
+                                :style="{
+                                  height: Math.max(14, ((cand.votes || 0) / maxCandidateVotes) * 180) + 'px'
+                                }"
+                              ></div>
+                            </div>
+                          </div>
+                        </div>
+                        <div>
+                          <p class="text-xl font-semibold text-slate-900 leading-tight">{{ cand.full_name }}</p>
+                          <p class="text-sm text-slate-600">Batch {{ cand.batch_year || 'N/A' }}</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <p v-else class="text-[11px] text-slate-500">No official candidates yet for this position.</p>
+                </div>
+              </div>
+
+              <p v-else class="text-xs text-slate-600">No positions available.</p>
+            </div>
           </div>
         </div>
 
-          <div class="grid gap-3 sm:grid-cols-2">
-            <div>
-              <label class="text-xs font-semibold text-slate-700">Contact Email (optional)</label>
-              <input
-              v-model="form.contact_email"
-              type="email"
-              class="mt-1 w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"
-              placeholder="name@email.com"
-              :disabled="!isNominationOpen || !canSubmitNomination"
-            />
-          </div>
-          <div>
-            <label class="text-xs font-semibold text-slate-700">Contact Phone (optional)</label>
-            <input
-              v-model="form.contact_phone"
-              type="text"
-              class="mt-1 w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"
-              placeholder="09xxxxxxxxx"
-              :disabled="!isNominationOpen || !canSubmitNomination"
-            />
-          </div>
-        </div>
-
-          <div>
-            <label class="text-xs font-semibold text-slate-700">Reason for nomination</label>
-            <textarea
-              v-model="form.reason"
-              rows="4"
-              class="mt-1 w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"
-              placeholder="Why are you nominating this alumnus/a?"
-              :disabled="!isNominationOpen || !canSubmitNomination"
-            ></textarea>
-          </div>
-
-          <div class="flex items-center gap-2 text-xs">
-            <input type="checkbox" v-model="form.is_good_standing" :disabled="!isNominationOpen" />
-            <span>Nominee is in good standing (checked by admin if applicable)</span>
-          </div>
-        </div>
-
+        <!-- Right: Nomination form -->
         <div class="space-y-3">
-          <div>
-            <label class="text-xs font-semibold text-slate-700">Nominee photo (optional)</label>
-            <input type="file" accept="image/*" @change="handleFile" :disabled="!isNominationOpen || !canSubmitNomination" />
+          <p
+            v-if="myNomination"
+            class="text-sm bg-[rgba(196,151,60,0.08)] border border-[rgba(196,151,60,0.35)] rounded-xl p-3"
+            :class="myNomination.status === 'rejected' ? 'text-amber-700' : 'text-[var(--hcad-navy)]'"
+          >
+            <span v-if="myNomination.status === 'promoted'">
+              Your nomination of <span class="font-semibold">{{ myNomination.nominee_full_name }}</span> for {{ myNomination.position_name }} was promoted. Thank you!
+            </span>
+            <span v-else-if="myNomination.status === 'pending'">
+              Your nomination of <span class="font-semibold">{{ myNomination.nominee_full_name }}</span> for {{ myNomination.position_name }} is pending admin review.
+            </span>
+            <span v-else-if="myNomination.status === 'rejected'">
+              Your nomination was rejected. Reason: <span class="font-semibold">{{ myNomination.rejection_reason || 'Not provided' }}</span>.
+              You may submit a new nomination now.
+            </span>
+            <span v-else>
+              You already nominated <span class="font-semibold">{{ myNomination.nominee_full_name }}</span> for {{ myNomination.position_name }}.
+            </span>
+          </p>
+
+          <div v-if="showNominationForm && canSubmitNomination" class="grid gap-3 md:grid-cols-2 border border-slate-200 rounded-2xl p-3 sm:p-4 bg-white/90">
+            <div class="space-y-3">
+              <div>
+                <label class="text-xs font-semibold text-slate-700">Position</label>
+                <select
+                  v-model="form.position_id"
+                  class="mt-1 w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"
+                  :disabled="!isNominationOpen || !canSubmitNomination"
+                >
+                  <option value="">-- Select position --</option>
+                  <option v-for="p in positions" :key="p.id" :value="p.id">{{ p.name_display || p.name }}</option>
+                </select>
+              </div>
+
+              <div>
+                <label class="text-xs font-semibold text-slate-700">Nominee full name</label>
+                <input
+                  v-model="form.nominee_full_name"
+                  type="text"
+                  class="mt-1 w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"
+                  placeholder="e.g. Juan Dela Cruz"
+                  :disabled="!isNominationOpen || !canSubmitNomination"
+                />
+              </div>
+
+              <div class="grid gap-3 sm:grid-cols-2">
+                <div>
+                  <label class="text-xs font-semibold text-slate-700">Batch / Year</label>
+                  <input
+                    v-model="form.nominee_batch_year"
+                    type="number"
+                    class="mt-1 w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"
+                    placeholder="1998"
+                    :disabled="!isNominationOpen || !canSubmitNomination"
+                  />
+                </div>
+                <div>
+                  <label class="text-xs font-semibold text-slate-700">Campus / Chapter</label>
+                  <input
+                    v-model="form.nominee_campus_chapter"
+                    type="text"
+                    class="mt-1 w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"
+                    placeholder="Main Campus / Digos / etc"
+                    :disabled="!isNominationOpen || !canSubmitNomination"
+                  />
+                </div>
+              </div>
+
+              <div class="grid gap-3 sm:grid-cols-2">
+                <div>
+                  <label class="text-xs font-semibold text-slate-700">Contact Email (optional)</label>
+                  <input
+                    v-model="form.contact_email"
+                    type="email"
+                    class="mt-1 w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"
+                    placeholder="name@email.com"
+                    :disabled="!isNominationOpen || !canSubmitNomination"
+                  />
+                </div>
+                <div>
+                  <label class="text-xs font-semibold text-slate-700">Contact Phone (optional)</label>
+                  <input
+                    v-model="form.contact_phone"
+                    type="text"
+                    class="mt-1 w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"
+                    placeholder="09xxxxxxxxx"
+                    :disabled="!isNominationOpen || !canSubmitNomination"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label class="text-xs font-semibold text-slate-700">Reason for nomination</label>
+                <textarea
+                  v-model="form.reason"
+                  rows="4"
+                  class="mt-1 w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"
+                  placeholder="Why are you nominating this alumnus/a?"
+                  :disabled="!isNominationOpen || !canSubmitNomination"
+                ></textarea>
+              </div>
+
+              <div class="flex items-center gap-2 text-xs">
+                <input type="checkbox" v-model="form.is_good_standing" :disabled="!isNominationOpen" />
+                <span>Nominee is in good standing (checked by admin if applicable)</span>
+              </div>
+            </div>
+
+            <div class="space-y-3">
+              <div>
+                <label class="text-xs font-semibold text-slate-700">Nominee photo (optional)</label>
+                <input type="file" accept="image/*" @change="handleFile" :disabled="!isNominationOpen || !canSubmitNomination" />
+              </div>
+
+              <div class="rounded-xl bg-slate-50 border border-slate-200 p-3 text-xs text-slate-600">
+                <p class="font-semibold text-slate-800 mb-2">Consent</p>
+                <label class="flex items-start gap-2">
+                  <input type="checkbox" v-model="form.consent" />
+                  <span>I agree to the processing of my personal data for the purpose of elections.</span>
+                </label>
+              </div>
+
+              <div class="flex flex-wrap gap-2">
+                <button
+                  @click="submitNomination"
+                  :disabled="submitting || !isNominationOpen || !canSubmitNomination"
+                  class="px-4 py-2 rounded-lg bg-emerald-600 text-white text-sm shadow-sm disabled:bg-slate-300"
+                >
+                  {{ submitting ? 'Submitting.' : 'Submit Nomination' }}
+                </button>
+              </div>
+
+              <p v-if="statusMessage" class="text-sm text-emerald-700">{{ statusMessage }}</p>
+              <p v-if="errorMessage" class="text-sm text-rose-600">{{ errorMessage }}</p>
+            </div>
           </div>
 
-          <div class="rounded-xl bg-slate-50 border border-slate-200 p-3 text-xs text-slate-600">
-            <p class="font-semibold text-slate-800 mb-2">Consent</p>
-            <label class="flex items-start gap-2">
-              <input type="checkbox" v-model="form.consent" />
-              <span>I agree to the processing of my personal data for the purpose of elections.</span>
-            </label>
+          <div v-else-if="!showNominationForm && !myNomination" class="text-sm text-slate-600 bg-slate-50 border border-slate-200 rounded-xl p-3">
+            Nomination window not open. Please check the posted schedule.
           </div>
-
-          <div class="flex flex-wrap gap-2">
-            <button
-              @click="submitNomination"
-              :disabled="submitting || !isNominationOpen || !canSubmitNomination"
-              class="px-4 py-2 rounded-lg bg-emerald-600 text-white text-sm shadow-sm disabled:bg-slate-300"
-            >
-              {{ submitting ? 'Submitting.' : 'Submit Nomination' }}
-            </button>
-          </div>
-
-          <p v-if="statusMessage" class="text-sm text-emerald-700">{{ statusMessage }}</p>
-          <p v-if="errorMessage" class="text-sm text-rose-600">{{ errorMessage }}</p>
-        </div>
-      </div>
-
-        <div v-else-if="!showNominationForm && !myNomination" class="text-sm text-slate-600 bg-slate-50 border border-slate-200 rounded-xl p-3">
-          Nomination window not open. Please check the posted schedule.
         </div>
       </div>
     </div>
-  </template>
+  </div>
+</template>
