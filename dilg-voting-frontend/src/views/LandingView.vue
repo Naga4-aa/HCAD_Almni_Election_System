@@ -46,6 +46,22 @@ const loadResults = async () => {
 }
 
 const hasPublishedResults = computed(() => results.value?.published)
+const winnersSummary = computed(() => {
+  if (!results.value?.positions?.length) return []
+  return results.value.positions
+    .map((pos) => {
+      const maxVotes = Math.max(...(pos.candidates || []).map((c) => c.votes || 0), 0)
+      const winner = (pos.candidates || []).find((c) => c.winner) || (pos.candidates || []).find((c) => (c.votes || 0) === maxVotes)
+      if (!winner) return null
+      return {
+        position_id: pos.position_id,
+        position: pos.position,
+        candidate: winner,
+        votes: winner.votes || 0,
+      }
+    })
+    .filter(Boolean)
+})
 
 onMounted(async () => {
   await Promise.all([loadElection(), loadResults()])
@@ -141,46 +157,77 @@ onMounted(async () => {
         <div class="text-xs text-slate-600" v-if="resultsLoading">Loading results...</div>
       </div>
 
-      <div v-if="hasPublishedResults" class="grid gap-4 md:grid-cols-2">
-        <div
-          v-for="pos in results?.positions || []"
-          :key="pos.position_id"
-          class="border rounded-xl p-4 shadow-sm"
-        >
-          <div class="flex items-center justify-between mb-2">
-            <h4 class="text-sm font-semibold text-slate-800">{{ pos.position }}</h4>
-            <span class="text-[11px] text-emerald-700 font-semibold">Published</span>
+      <div v-if="hasPublishedResults" class="grid gap-4 lg:grid-cols-[1.6fr_1fr]">
+        <div class="grid gap-4 md:grid-cols-2">
+          <div
+            v-for="pos in results?.positions || []"
+            :key="pos.position_id"
+            class="border rounded-xl p-4 shadow-sm bg-white"
+          >
+            <div class="flex items-center justify-between mb-2">
+              <h4 class="text-sm font-semibold text-slate-800">{{ pos.position }}</h4>
+              <span class="text-[11px] text-emerald-700 font-semibold">Published</span>
+            </div>
+            <ul class="space-y-3 text-sm text-slate-700">
+              <li
+                v-for="cand in pos.candidates"
+                :key="cand.id"
+                class="space-y-1"
+              >
+                <div class="flex items-center justify-between">
+                  <div>
+                    <p class="font-semibold" :class="{ 'text-emerald-700': cand.winner }">
+                      {{ cand.full_name }}
+                    </p>
+                    <p class="text-[11px] text-slate-500">
+                      Batch {{ cand.batch_year }} - {{ cand.campus_chapter || 'Campus/Chapter not set' }}
+                    </p>
+                  </div>
+                  <div class="text-right">
+                    <p class="text-sm font-semibold text-slate-800">{{ cand.votes }} vote(s)</p>
+                    <p v-if="cand.winner" class="text-[11px] text-emerald-700 font-semibold">Winner</p>
+                  </div>
+                </div>
+                <div class="h-2.5 rounded-full bg-slate-100 overflow-hidden">
+                  <div
+                    class="h-full rounded-full bg-gradient-to-r from-[var(--hcad-gold)] to-[var(--hcad-navy)] transition-all duration-300"
+                    :style="{
+                      width: (Math.max(...pos.candidates.map(c => c.votes), 1) ? (cand.votes / Math.max(...pos.candidates.map(c => c.votes), 1)) * 100 : 0) + '%'
+                    }"
+                  ></div>
+                </div>
+              </li>
+            </ul>
           </div>
-          <ul class="space-y-3 text-sm text-slate-700">
-            <li
-              v-for="cand in pos.candidates"
-              :key="cand.id"
-              class="space-y-1"
-            >
-              <div class="flex items-center justify-between">
-                <div>
-                  <p class="font-semibold" :class="{ 'text-emerald-700': cand.winner }">
-                    {{ cand.full_name }}
-                  </p>
-                  <p class="text-[11px] text-slate-500">
-                    Batch {{ cand.batch_year }} - {{ cand.campus_chapter || 'Campus/Chapter not set' }}
-                  </p>
+        </div>
+
+        <div v-if="winnersSummary.length" class="space-y-3">
+          <div class="bg-[#f7f8fa] rounded-2xl border border-slate-200 p-4 sm:p-5 shadow-sm space-y-3">
+            <div class="flex items-center justify-between gap-2">
+              <h3 class="text-sm font-semibold text-slate-800">Election Results Summary</h3>
+              <span class="text-[11px] text-slate-500">Top candidate per position</span>
+            </div>
+            <div class="grid gap-3">
+              <div
+                v-for="item in winnersSummary"
+                :key="item.position_id"
+                class="border border-slate-200 rounded-2xl bg-white p-3 flex gap-3 items-center shadow-sm"
+              >
+                <div class="h-14 w-14 rounded-xl overflow-hidden border border-slate-200 bg-white flex-shrink-0">
+                  <img :src="item.candidate.photo_url || 'https://placehold.co/80x80?text=No+Photo'" alt="Winner photo" class="h-full w-full object-cover" />
                 </div>
-                <div class="text-right">
-                  <p class="text-sm font-semibold text-slate-800">{{ cand.votes }} vote(s)</p>
-                  <p v-if="cand.winner" class="text-[11px] text-emerald-700 font-semibold">Winner</p>
+                <div class="flex-1 min-w-0 space-y-1">
+                  <p class="text-xs font-semibold text-slate-700 uppercase">{{ item.position }}</p>
+                  <p class="text-sm font-semibold text-slate-900 truncate">{{ item.candidate.full_name }}</p>
+                  <p class="text-[11px] text-slate-500 truncate">
+                    Batch {{ item.candidate.batch_year || 'N/A' }}
+                    <span v-if="item.candidate.campus_chapter"> · {{ item.candidate.campus_chapter }}</span>
+                  </p>
+                  <p class="text-[12px] font-semibold text-[var(--hcad-navy)]">{{ item.votes }} vote(s)</p>
                 </div>
               </div>
-              <div class="h-2.5 rounded-full bg-slate-100 overflow-hidden">
-                <div
-                  class="h-full rounded-full bg-gradient-to-r from-[var(--hcad-gold)] to-[var(--hcad-navy)] transition-all duration-300"
-                  :style="{
-                    width: (Math.max(...pos.candidates.map(c => c.votes), 1) ? (cand.votes / Math.max(...pos.candidates.map(c => c.votes), 1)) * 100 : 0) + '%'
-                  }"
-                ></div>
-              </div>
-            </li>
-          </ul>
+            </div>
+          </div>
         </div>
       </div>
     </section>
