@@ -1,5 +1,5 @@
 ﻿<script setup>
-import { RouterLink, RouterView, useRoute } from 'vue-router'
+import { RouterLink, RouterView, useRoute, useRouter } from 'vue-router'
 import { computed, ref, onMounted, onUnmounted, watch } from 'vue'
 import { useAuthStore } from './stores/auth'
 import { useAdminAuthStore } from './stores/adminAuth'
@@ -9,6 +9,7 @@ import Logo from './assets/HCAD_Alumni_Org_Logo.jpg'
 const authStore = useAuthStore()
 const adminAuth = useAdminAuthStore()
 const route = useRoute()
+const router = useRouter()
 const mobileMenuOpen = ref(false)
 const headerNotifOpen = ref(false)
 const headerNotifItems = ref([])
@@ -50,6 +51,26 @@ const formatHeaderNotifDate = (value) => {
   } catch (e) {
     return value
   }
+}
+
+const extractVoterSearch = (notif) => {
+  if (!notif?.message) return ''
+  const idMatch = notif.message.match(/\(ID\s+([A-Za-z0-9-]+)\)/i)
+  if (idMatch?.[1]) return idMatch[1]
+  const nameMatch = notif.message.match(/Voter '([^']+)'/i)
+  if (nameMatch?.[1]) return nameMatch[1]
+  return ''
+}
+
+const handleHeaderNotifClick = async (notif) => {
+  if (!adminAuth.isAuthenticated) return
+  const focusVoter = extractVoterSearch(notif)
+  headerNotifOpen.value = false
+  headerNotifExpanded.value = false
+  if (notif?.id) {
+    markHeaderNotificationRead(notif.id)
+  }
+  await router.push({ path: '/admin', query: focusVoter ? { focusVoter } : {} })
 }
 
 const loadHeaderNotifications = async () => {
@@ -334,7 +355,10 @@ watch(
                 >
                   <li v-for="n in headerNotifItems" :key="n.id" class="py-2 flex items-start gap-2">
                     <span class="mt-0.5 h-2 w-2 rounded-full" :class="n.is_read ? 'bg-slate-300' : 'bg-emerald-500'"></span>
-                    <div class="flex-1">
+                    <div
+                      class="flex-1 cursor-pointer rounded-lg hover:bg-slate-50 px-2 -mx-2 py-1"
+                      @click="handleHeaderNotifClick(n)"
+                    >
                       <p class="font-semibold capitalize text-slate-800">{{ n.type || 'Notice' }}</p>
                       <p class="text-slate-700">{{ n.message }}</p>
                       <p class="text-[10px] text-slate-500">{{ formatHeaderNotifDate(n.created_at) }}</p>

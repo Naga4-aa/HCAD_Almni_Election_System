@@ -3,10 +3,11 @@
 import { ref, onMounted, onUnmounted, watch, computed } from 'vue'
 import api from '../api'
 import { useAdminAuthStore } from '../stores/adminAuth'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 
 const adminStore = useAdminAuthStore()
 const router = useRouter()
+const route = useRoute()
 
 const stats = ref(null)
 const tally = ref([])
@@ -582,6 +583,20 @@ const filteredVoters = computed(() => {
   })
 })
 
+const focusVoterFromQuery = (val) => {
+  if (!val) return
+  const trimmed = String(val).trim()
+  if (!trimmed) return
+  activeSection.value = 'voters'
+  voterSearch.value = trimmed
+}
+
+watch(
+  () => route.query.focusVoter,
+  (val) => focusVoterFromQuery(val),
+  { immediate: true },
+)
+
 const resetAllVoters = async () => {
   const confirmReset = await askConfirm({
     title: 'Reset voters',
@@ -1080,12 +1095,15 @@ onUnmounted(() => {
       <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <h3 class="text-sm font-semibold">Voters</h3>
         <div class="flex flex-wrap gap-2">
-          <input
-            v-model="voterSearch"
-            type="text"
-            placeholder="Search name, voter ID, or batch"
-            class="text-xs px-3 py-1.5 rounded-lg border border-emerald-200 bg-white/90 shadow-inner"
-          />
+          <div class="relative flex-1 min-w-[340px] max-w-[560px]">
+            <input
+              v-model="voterSearch"
+              type="text"
+              placeholder="Search name, voter ID, or batch"
+              aria-label="Search voters"
+              class="w-full text-xs px-3 py-1.5 rounded-lg border border-emerald-200 bg-white/90 shadow-inner"
+            />
+          </div>
           <button
             @click="resetAllVoters"
             :disabled="resettingVoters"
