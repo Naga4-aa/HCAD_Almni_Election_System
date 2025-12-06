@@ -316,7 +316,7 @@ watch(
 
               <div
                 v-if="headerNotifOpen"
-                class="absolute right-0 mt-2 rounded-2xl border border-slate-200 bg-white/95 shadow-2xl backdrop-blur p-3 z-30"
+                class="absolute right-0 mt-3 rounded-2xl border border-slate-200 bg-white shadow-2xl backdrop-blur p-3 z-50 ring-1 ring-slate-100"
                 :class="headerNotifExpanded ? 'w-[28rem] max-w-[28rem]' : 'w-80 max-w-xs sm:max-w-sm'"
               >
                 <div class="flex items-start justify-between gap-2">
