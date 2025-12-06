@@ -72,6 +72,7 @@ const resettingVoters = ref(false)
 const resetPins = ref(false)
 const resettingElection = ref(false)
 let tallyTimer = null
+let electionMessageTimer = null
 
 // Themed confirm dialog
 const confirmDialog = ref({
@@ -132,6 +133,17 @@ watch(
       hasNewNominations.value = false
       lastNewNominations.value = []
     }
+  },
+)
+
+watch(
+  () => electionMessage.value,
+  (val) => {
+    if (!val) return
+    if (electionMessageTimer) clearTimeout(electionMessageTimer)
+    electionMessageTimer = setTimeout(() => {
+      electionMessage.value = ''
+    }, 5000)
   },
 )
 
@@ -658,6 +670,7 @@ onMounted(async () => {
 onUnmounted(() => {
   if (tallyTimer) clearInterval(tallyTimer)
   if (nominationsTimer.value) clearInterval(nominationsTimer.value)
+  if (electionMessageTimer) clearTimeout(electionMessageTimer)
 })
 </script>
 
