@@ -21,6 +21,7 @@ const timelineMode = ref('timeline') // 'timeline' | 'demo'
 const savingElection = ref(false)
 const electionError = ref('')
 const electionMessage = ref('')
+const electionBannerVisible = ref(false)
 const publishingResults = ref(false)
 const publishedResults = ref(null)
 const loadingPublishedResults = ref(false)
@@ -150,6 +151,15 @@ watch(
 const clearNewNominations = () => {
   hasNewNominations.value = false
   lastNewNominations.value = []
+}
+
+const showElectionMessage = (text) => {
+  electionMessage.value = text
+  electionBannerVisible.value = true
+  if (electionMessageTimer) clearTimeout(electionMessageTimer)
+  electionMessageTimer = setTimeout(() => {
+    electionBannerVisible.value = false
+  }, 5000)
 }
 
 const toInput = (val) => {
@@ -430,7 +440,7 @@ const saveElection = async () => {
       : await api.post('admin/election/active/', payload)
     election.value = res.data
     timelineMode.value = res.data.mode || 'timeline'
-    electionMessage.value = isUpdate ? 'Timeline saved.' : 'Election created.'
+    showElectionMessage(isUpdate ? 'Timeline saved.' : 'Election created.')
   } catch (err) {
     electionError.value = err.response?.data?.error || 'Failed to save timeline.'
   } finally {
@@ -455,7 +465,7 @@ const publishResults = async (publishFlag) => {
   try {
     const res = await api.post('admin/election/publish/', { publish: publishFlag })
     election.value = res.data
-    electionMessage.value = publishFlag ? 'Results published.' : 'Results unpublished.'
+    showElectionMessage(publishFlag ? 'Results published.' : 'Results unpublished.')
     await loadPublishedResults()
   } catch (err) {
     electionError.value = err.response?.data?.error || 'Failed to update results status.'
@@ -892,7 +902,12 @@ onUnmounted(() => {
       <p v-if="electionError" class="text-xs text-rose-600">{{ electionError }}</p>
       <p
         v-else-if="electionMessage"
-        class="text-sm text-emerald-800 font-semibold inline-flex items-center gap-2 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2 shadow-[0_0_0_3px_rgba(16,185,129,0.15)]"
+        class="text-sm font-semibold inline-flex items-center gap-2 transition-all"
+        :class="
+          electionBannerVisible
+            ? 'text-emerald-800 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-2 shadow-[0_0_0_3px_rgba(16,185,129,0.15)]'
+            : 'text-emerald-700'
+        "
       >
         {{ electionMessage }}
       </p>
