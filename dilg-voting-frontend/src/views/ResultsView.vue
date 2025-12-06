@@ -81,6 +81,30 @@ const loadElection = async () => {
 
 let timerId
 let refreshing = false
+let publishTimer = null
+
+const clearPublishTimer = () => {
+  if (publishTimer) {
+    clearTimeout(publishTimer)
+    publishTimer = null
+  }
+}
+
+const schedulePublishCheck = () => {
+  clearPublishTimer()
+  const target = toMs(election.value?.results_at)
+  if (!target) return
+  const msUntil = target - Date.now()
+  if (msUntil <= 0) {
+    loadResults({ silent: false })
+    return
+  }
+  publishTimer = setTimeout(async () => {
+    await loadResults({ silent: false })
+    await loadElection()
+    schedulePublishCheck()
+  }, Math.min(msUntil + 1000, 6 * 60 * 60 * 1000))
+}
 
 const tick = async () => {
   now.value = Date.now()
@@ -93,15 +117,18 @@ const tick = async () => {
   } finally {
     refreshing = false
   }
+  schedulePublishCheck()
 }
 
 onMounted(async () => {
   await Promise.all([loadResults(), loadElection()])
+  schedulePublishCheck()
   timerId = setInterval(tick, 15000)
 })
 
 onUnmounted(() => {
   if (timerId) clearInterval(timerId)
+  clearPublishTimer()
 })
 </script>
 

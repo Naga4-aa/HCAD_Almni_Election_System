@@ -18,6 +18,7 @@ const errorMessage = ref('')
 const promotingId = ref(null)
 const election = ref(null)
 const timelineMode = ref('timeline') // 'timeline' | 'demo'
+const timelineLocked = ref(false)
 const savingElection = ref(false)
 const electionError = ref('')
 const electionMessage = ref('')
@@ -176,6 +177,42 @@ const formatDateTime = (val) => {
 const loadStats = async () => {
   const res = await api.get('admin/stats/')
   stats.value = res.data
+}
+
+const TIMELINE_LOCK_KEY = 'adminTimelineLocked'
+const loadTimelineLock = () => {
+  try {
+    const raw = localStorage.getItem(TIMELINE_LOCK_KEY)
+    timelineLocked.value = raw === '1'
+  } catch (_) {
+    timelineLocked.value = false
+  }
+}
+
+const saveTimelineLock = (locked) => {
+  timelineLocked.value = !!locked
+  try {
+    localStorage.setItem(TIMELINE_LOCK_KEY, timelineLocked.value ? '1' : '0')
+  } catch (_) {
+    // ignore storage issues
+  }
+}
+
+const toggleTimelineLock = async () => {
+  const next = !timelineLocked.value
+  const confirmed = await askConfirm({
+    title: next ? 'Lock timeline' : 'Unlock timeline',
+    message: next
+      ? 'Lock the saved timeline so dates and settings cannot be edited until you unlock?'
+      : 'Unlock the timeline to allow edits?',
+    confirmText: next ? 'Lock timeline' : 'Unlock timeline',
+    cancelText: 'Cancel',
+    tone: 'danger',
+  })
+  if (!confirmed) return
+  saveTimelineLock(next)
+  electionMessage.value = next ? 'Timeline locked. Editing disabled.' : 'Timeline unlocked. You can edit again.'
+  electionError.value = ''
 }
 
 const loadTally = async () => {
@@ -363,6 +400,10 @@ const resetVoterPin = async (voter) => {
 }
 
 const clearTimelineDates = () => {
+  if (timelineLocked.value) {
+    electionError.value = 'Timeline is locked. Unlock to clear dates.'
+    return
+  }
   electionForm.value.nomination_start = ''
   electionForm.value.nomination_end = ''
   electionForm.value.voting_start = ''
@@ -377,6 +418,7 @@ const loadElection = async () => {
     const res = await api.get('admin/election/active/')
     election.value = res.data
     timelineMode.value = res.data.mode || 'timeline'
+    loadTimelineLock()
     electionForm.value = {
       name: res.data.name || '',
       description: res.data.description || '',
@@ -394,6 +436,7 @@ const loadElection = async () => {
       // No election yet; allow creating from the dashboard UI.
       election.value = null
       timelineMode.value = 'timeline'
+      loadTimelineLock()
       electionForm.value = {
         name: '',
         description: '',
@@ -416,6 +459,10 @@ const loadElection = async () => {
 const saveElection = async () => {
   if (!electionForm.value.name.trim()) {
     electionError.value = 'Election name is required.'
+    return
+  }
+  if (timelineLocked.value) {
+    electionError.value = 'Timeline is locked. Unlock to make changes.'
     return
   }
   savingElection.value = true
@@ -499,6 +546,10 @@ const triggerDemoPhase = async (action) => {
 
 const switchMode = async (mode) => {
   if (!election.value || mode === timelineMode.value) return
+  if (timelineLocked.value) {
+    electionError.value = 'Unlock the timeline to change mode.'
+    return
+  }
 
   const toDemo = mode === 'demo'
   const confirmed = await askConfirm({
@@ -643,6 +694,7 @@ const resetAllVoters = async () => {
 
 onMounted(async () => {
   adminStore.initFromStorage()
+  loadTimelineLock()
 
   if (!adminStore.isAuthenticated) {
     router.push('/admin-login')
@@ -903,9 +955,19 @@ onUnmounted(() => {
       </div>
 
     <div v-if="activeSection === 'timeline'" id="timeline" class="bg-gradient-to-br from-[rgba(196,151,60,0.12)] via-white to-[rgba(15,35,66,0.05)] rounded-2xl border border-[rgba(196,151,60,0.35)] p-4 sm:p-5 shadow-sm space-y-3">
-      <div class="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+      <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <h3 class="text-sm font-semibold leading-tight">Election timeline</h3>
-        <span class="text-[11px] text-slate-500">Nomination & voting windows</span>
+        <div class="flex items-center gap-2">
+          <span class="text-[11px] text-slate-500">Nomination & voting windows</span>
+          <button
+            type="button"
+            class="text-[11px] px-3 py-1.5 rounded-lg border"
+            :class="timelineLocked ? 'border-slate-300 bg-slate-100 text-slate-700' : 'border-[var(--hcad-gold)] bg-white text-[var(--hcad-navy)] hover:bg-[rgba(196,151,60,0.12)]'"
+            @click="toggleTimelineLock"
+          >
+            {{ timelineLocked ? 'Unlock timeline' : 'Lock timeline' }}
+          </button>
+        </div>
       </div>
       <p v-if="electionError" class="text-xs text-rose-600">{{ electionError }}</p>
       <p
@@ -943,45 +1005,46 @@ onUnmounted(() => {
       <div v-if="timelineMode === 'timeline'" class="grid gap-3 sm:grid-cols-2">
         <div class="sm:col-span-2">
           <label class="block text-xs font-semibold text-slate-700 mb-1">Election name</label>
-          <input v-model="electionForm.name" type="text" placeholder="e.g., 2025 HCAD Alumni Elections" class="w-full border border-emerald-200 rounded-lg px-3 py-2 text-sm bg-white/90" />
+          <input v-model="electionForm.name" type="text" placeholder="e.g., 2025 HCAD Alumni Elections" class="w-full border border-emerald-200 rounded-lg px-3 py-2 text-sm bg-white/90" :disabled="timelineLocked || timelineMode === 'demo'" />
         </div>
         <div class="sm:col-span-2">
           <label class="block text-xs font-semibold text-slate-700 mb-1">Description (optional)</label>
-          <textarea v-model="electionForm.description" rows="2" class="w-full border border-emerald-200 rounded-lg px-3 py-2 text-sm bg-white/90"></textarea>
+          <textarea v-model="electionForm.description" rows="2" class="w-full border border-emerald-200 rounded-lg px-3 py-2 text-sm bg-white/90" :disabled="timelineLocked || timelineMode === 'demo'"></textarea>
         </div>
         <div>
           <label class="block text-xs font-semibold text-slate-700 mb-1">Nomination start</label>
-          <input v-model="electionForm.nomination_start" type="datetime-local" class="w-full border border-emerald-200 rounded-lg px-3 py-2 text-sm bg-white/90" />
+          <input v-model="electionForm.nomination_start" type="datetime-local" class="w-full border border-emerald-200 rounded-lg px-3 py-2 text-sm bg-white/90" :disabled="timelineLocked || timelineMode === 'demo'" />
         </div>
         <div>
           <label class="block text-xs font-semibold text-slate-700 mb-1">Nomination end</label>
-          <input v-model="electionForm.nomination_end" type="datetime-local" class="w-full border border-emerald-200 rounded-lg px-3 py-2 text-sm bg-white/90" />
+          <input v-model="electionForm.nomination_end" type="datetime-local" class="w-full border border-emerald-200 rounded-lg px-3 py-2 text-sm bg-white/90" :disabled="timelineLocked || timelineMode === 'demo'" />
         </div>
         <div>
           <label class="block text-xs font-semibold text-slate-700 mb-1">Voting start</label>
-          <input v-model="electionForm.voting_start" type="datetime-local" class="w-full border border-emerald-200 rounded-lg px-3 py-2 text-sm bg-white/90" />
+          <input v-model="electionForm.voting_start" type="datetime-local" class="w-full border border-emerald-200 rounded-lg px-3 py-2 text-sm bg-white/90" :disabled="timelineLocked || timelineMode === 'demo'" />
         </div>
         <div>
           <label class="block text-xs font-semibold text-slate-700 mb-1">Voting end</label>
-          <input v-model="electionForm.voting_end" type="datetime-local" class="w-full border border-emerald-200 rounded-lg px-3 py-2 text-sm bg-white/90" />
+          <input v-model="electionForm.voting_end" type="datetime-local" class="w-full border border-emerald-200 rounded-lg px-3 py-2 text-sm bg-white/90" :disabled="timelineLocked || timelineMode === 'demo'" />
         </div>
         <div class="sm:col-span-2">
           <label class="block text-xs font-semibold text-slate-700 mb-1">Results announcement</label>
-          <input v-model="electionForm.results_at" type="datetime-local" class="w-full border border-emerald-200 rounded-lg px-3 py-2 text-sm bg-white/90" />
+          <input v-model="electionForm.results_at" type="datetime-local" class="w-full border border-emerald-200 rounded-lg px-3 py-2 text-sm bg-white/90" :disabled="timelineLocked || timelineMode === 'demo'" />
         </div>
         <label class="flex items-center gap-2 text-xs text-slate-700">
-          <input v-model="electionForm.auto_publish_results" type="checkbox" />
+          <input v-model="electionForm.auto_publish_results" type="checkbox" :disabled="timelineLocked || timelineMode === 'demo'" />
           Auto-publish results at the scheduled time
         </label>
         <label class="flex items-center gap-2 text-xs text-slate-700">
-          <input v-model="electionForm.is_active" type="checkbox" />
+          <input v-model="electionForm.is_active" type="checkbox" :disabled="timelineLocked || timelineMode === 'demo'" />
           Set election as active
         </label>
         <div class="sm:col-span-2 flex flex-wrap gap-2">
           <button
             @click="clearTimelineDates"
             type="button"
-            class="px-3 py-1.5 rounded-lg border border-[var(--hcad-gold)] text-xs hover:bg-[rgba(196,151,60,0.12)] bg-white shadow-sm"
+            class="px-3 py-1.5 rounded-lg border border-[var(--hcad-gold)] text-xs hover:bg-[rgba(196,151,60,0.12)] bg-white shadow-sm disabled:opacity-60"
+            :disabled="timelineLocked || timelineMode === 'demo'"
           >
             Clear dates
           </button>
@@ -993,7 +1056,7 @@ onUnmounted(() => {
       <div class="flex flex-col sm:flex-row sm:items-center gap-3">
         <button
           @click="saveElection"
-          :disabled="savingElection || timelineMode === 'demo'"
+          :disabled="savingElection || timelineMode === 'demo' || timelineLocked"
           class="px-4 py-2 rounded-lg bg-[var(--hcad-navy)] text-white text-sm shadow-sm disabled:bg-slate-300"
         >
           {{ savingElection ? 'Saving.' : 'Save timeline' }}
