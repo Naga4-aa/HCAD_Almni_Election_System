@@ -21,6 +21,7 @@ const errorMessage = ref('')
 const consent = ref(false)
 const now = ref(Date.now())
 const lastElectionId = ref(null)
+const lastSignature = ref(null)
 const draftRestored = ref(false)
 
 const isDemoMode = computed(() => election.value?.mode === 'demo')
@@ -245,6 +246,20 @@ let timerId
 let countdownTimer
 let refreshingElection = false
 
+const buildSignature = () => {
+  if (!election.value?.id) return null
+  return [
+    election.value.id,
+    election.value.mode,
+    election.value.demo_phase || '',
+    election.value.phase || '',
+    election.value.voting_start || '',
+    election.value.voting_end || '',
+    election.value.results_at || '',
+    election.value.results_published ? '1' : '0',
+  ].join('|')
+}
+
 const tick = async () => {
   now.value = Date.now()
   if (refreshingElection) return
@@ -254,13 +269,20 @@ const tick = async () => {
     const currentId = election.value?.id || null
     const active = !!election.value?.is_active
     const timelineReady = hasTimeline.value
+    const signature = buildSignature()
     if (!active || !currentId || !timelineReady) {
       clearBallot()
       lastElectionId.value = null
+      lastSignature.value = null
       return
     }
-    if (lastElectionId.value !== currentId) {
+    const changed =
+      lastElectionId.value !== currentId ||
+      lastSignature.value !== signature
+
+    if (changed) {
       lastElectionId.value = currentId
+      lastSignature.value = signature
       await loadPositions()
       await loadAllCandidates()
       await loadMyVotes()
@@ -283,6 +305,7 @@ onMounted(async () => {
     const currentId = election.value?.id || null
     if (currentId && election.value.is_active && hasTimeline.value) {
       lastElectionId.value = currentId
+      lastSignature.value = buildSignature()
       await loadPositions()
       await loadAllCandidates()
       await loadMyVotes()

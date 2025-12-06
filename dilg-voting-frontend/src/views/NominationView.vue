@@ -31,6 +31,19 @@ const errorMessage = ref('')
 const loading = ref(false)
 const submitting = ref(false)
 const lastElectionId = ref(null)
+const isSameCandidateList = (prev = [], next = []) => {
+  if (prev.length !== next.length) return false
+  for (let i = 0; i < prev.length; i += 1) {
+    const a = prev[i] || {}
+    const b = next[i] || {}
+    if (a.id !== b.id) return false
+    const fields = ['full_name', 'batch_year', 'campus_chapter', 'photo_url', 'votes']
+    for (const f of fields) {
+      if ((a?.[f] ?? null) !== (b?.[f] ?? null)) return false
+    }
+  }
+  return true
+}
 const candidatePlaceholder =
   "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='80' height='80' viewBox='0 0 80 80'><rect width='80' height='80' rx='40' fill='%23dfe4ea'/><path d='M40 40a12 12 0 1 0-0.001-24.001A12 12 0 0 0 40 40zm0 8c-11.046 0-20 6.268-20 14v4h40v-4c0-7.732-8.954-14-20-14z' fill='%2390a4ae'/></svg>"
 const candidateTab = ref(null)
@@ -42,7 +55,6 @@ const activeCandidates = computed(() => {
   if (!pid) return []
   return candidatesByPosition.value[pid] || []
 })
-const totalCandidateVotes = computed(() => activeCandidates.value.reduce((sum, c) => sum + (c.votes || 0), 0))
 const lastSignature = ref(null)
 const voterNotifications = ref([])
 const voterUnread = ref(0)
@@ -165,10 +177,20 @@ const loadCandidates = async () => {
       }),
     )
     const map = {}
+    const previousIds = Object.keys(candidatesByPosition.value || {})
+    let changed = previousIds.length === 0 || previousIds.length !== entries.length
     entries.forEach(([id, items]) => {
       map[id] = items
+      if (!previousIds.includes(String(id))) {
+        changed = true
+      }
+      if (!isSameCandidateList(candidatesByPosition.value[id] || [], items)) {
+        changed = true
+      }
     })
-    candidatesByPosition.value = map
+    if (changed) {
+      candidatesByPosition.value = map
+    }
     if (!candidateTab.value) {
       candidateTab.value = positions.value[0]?.id || null
     } else {
@@ -478,7 +500,7 @@ onUnmounted(() => {
                     </div>
                   </div>
 
-                  <div v-if="activeCandidates.length" class="overflow-x-auto">
+                  <div v-if="activeCandidates.length" class="candidate-scroll overflow-x-auto w-full md:max-w-[840px]">
                     <div class="flex gap-4 pb-2 min-h-[320px]">
                       <div
                         v-for="cand in activeCandidates"
@@ -492,27 +514,6 @@ onUnmounted(() => {
                           <p class="text-base font-semibold text-slate-900 leading-tight">{{ cand.full_name }}</p>
                           <p class="text-[13px] text-slate-600">Batch {{ cand.batch_year || 'N/A' }}</p>
                           <p class="text-[12px] text-slate-500">{{ cand.campus_chapter || 'Campus/Chapter not set' }}</p>
-                        </div>
-                        <div class="space-y-1">
-                          <p class="text-lg font-semibold text-slate-900">{{ (cand.votes || 0) === 1 ? '1 vote' : `${cand.votes || 0} votes` }}</p>
-                          <div class="w-full h-3 rounded-full bg-slate-200 overflow-hidden border border-slate-300/70">
-                            <div
-                              class="h-full bg-gradient-to-r from-[var(--hcad-gold)] to-[var(--hcad-navy)]"
-                              :style="{
-                                width:
-                                  (totalCandidateVotes
-                                    ? Math.min(100, Math.round(((cand.votes || 0) / totalCandidateVotes) * 100))
-                                    : 0) + '%'
-                              }"
-                            ></div>
-                          </div>
-                          <p class="text-[11px] text-slate-600 font-semibold">
-                            {{
-                              totalCandidateVotes
-                                ? Math.min(100, Math.round(((cand.votes || 0) / totalCandidateVotes) * 100))
-                                : 0
-                            }}%
-                          </p>
                         </div>
                       </div>
                     </div>
@@ -674,3 +675,25 @@ onUnmounted(() => {
     </div>
   </div>
 </template>
+
+<style scoped>
+.candidate-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: #c7cbd4 #e5e7eb;
+}
+
+.candidate-scroll::-webkit-scrollbar {
+  height: 10px;
+}
+
+.candidate-scroll::-webkit-scrollbar-thumb {
+  background-color: #c7cbd4;
+  border-radius: 9999px;
+  border: 2px solid #e5e7eb;
+}
+
+.candidate-scroll::-webkit-scrollbar-track {
+  background-color: #e5e7eb;
+  border-radius: 9999px;
+}
+</style>
