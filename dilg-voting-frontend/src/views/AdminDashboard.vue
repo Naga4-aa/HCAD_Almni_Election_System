@@ -35,9 +35,9 @@ const lastNewNominations = ref([])
 const activeTally = computed(() => {
   return tally.value?.find((p) => p.position_id === tallyTab.value) || null
 })
-const maxTallyVotes = computed(() => {
-  if (!activeTally.value || !activeTally.value.candidates?.length) return 1
-  return Math.max(...activeTally.value.candidates.map((c) => c.votes || 0), 1)
+const tallyTotalVotes = computed(() => {
+  if (!activeTally.value || !activeTally.value.candidates?.length) return 0
+  return activeTally.value.candidates.reduce((sum, c) => sum + (c.votes || 0), 0)
 })
 const publishedResultsTab = ref(null)
 const activePublishedPosition = computed(() => {
@@ -781,32 +781,40 @@ onUnmounted(() => {
           </div>
         </div>
         <div v-if="activeTally.candidates.length" class="overflow-x-auto pb-2">
-          <div class="flex gap-5 min-h-[360px]">
+          <div class="flex gap-4 min-h-[320px]">
             <div
               v-for="cand in activeTally.candidates"
               :key="cand.candidate_id"
-              class="bg-white border border-[rgba(196,151,60,0.35)] rounded-2xl shadow-sm p-4 flex flex-col gap-3 min-w-[320px]"
+              class="bg-[#f7f8fa] border border-slate-200 rounded-2xl shadow-sm p-3 flex flex-col gap-3 min-w-[240px] max-w-[260px]"
             >
-              <div class="flex items-start gap-4">
-                <div class="rounded-xl overflow-hidden bg-slate-100 border border-slate-200 h-[220px] w-[220px] flex-shrink-0">
-                  <img :src="cand.photo_url || candidatePlaceholder" alt="Candidate photo" class="h-full w-full object-cover" />
-                </div>
-                <div class="flex flex-col items-center gap-2 mt-1">
-                  <span class="text-xs text-slate-700 font-semibold whitespace-nowrap">{{ cand.votes }} vote(s)</span>
-                  <div class="w-8 h-[180px] rounded-lg overflow-hidden border border-[rgba(196,151,60,0.5)] bg-slate-100 flex items-end">
-                    <div
-                      class="w-full bg-gradient-to-b from-[var(--hcad-navy)] to-[var(--hcad-gold)]"
-                      :style="{
-                        height: Math.max(14, ((cand.votes || 0) / maxTallyVotes) * 180) + 'px'
-                      }"
-                    ></div>
-                  </div>
-                </div>
+              <div class="rounded-xl overflow-hidden bg-white border border-slate-200 h-[200px] w-full">
+                <img :src="cand.photo_url || candidatePlaceholder" alt="Candidate photo" class="h-full w-full object-cover" />
               </div>
-              <div>
-                <p class="text-xl font-semibold text-slate-900 leading-tight">{{ cand.full_name }}</p>
-                <p class="text-sm text-slate-600">Batch {{ cand.batch_year || 'N/A' }}</p>
-                <p class="text-xs text-slate-500"> {{ cand.campus_chapter || 'Campus/Chapter not set' }}</p>
+              <div class="space-y-1">
+                <p class="text-base font-semibold text-slate-900 leading-tight">{{ cand.full_name }}</p>
+                <p class="text-[13px] text-slate-600">Batch {{ cand.batch_year || 'N/A' }}</p>
+                <p class="text-[12px] text-slate-500">{{ cand.campus_chapter || 'Campus/Chapter not set' }}</p>
+              </div>
+              <div class="space-y-1">
+                <p class="text-lg font-semibold text-slate-900">{{ cand.votes === 1 ? '1 vote' : `${cand.votes} votes` }}</p>
+                <div class="w-full h-3 rounded-full bg-slate-200 overflow-hidden border border-slate-300/70">
+                  <div
+                    class="h-full bg-gradient-to-r from-[var(--hcad-gold)] to-[var(--hcad-navy)]"
+                    :style="{
+                      width:
+                        (tallyTotalVotes
+                          ? Math.min(100, Math.round(((cand.votes || 0) / tallyTotalVotes) * 100))
+                          : 0) + '%'
+                    }"
+                  ></div>
+                </div>
+                <p class="text-[11px] text-slate-600 font-semibold">
+                  {{
+                    tallyTotalVotes
+                      ? Math.min(100, Math.round(((cand.votes || 0) / tallyTotalVotes) * 100))
+                      : 0
+                  }}%
+                </p>
               </div>
               <div class="flex flex-wrap gap-2 items-center pt-1">
                 <label

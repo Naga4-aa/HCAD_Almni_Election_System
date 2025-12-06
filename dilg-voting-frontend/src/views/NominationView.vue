@@ -42,7 +42,7 @@ const activeCandidates = computed(() => {
   if (!pid) return []
   return candidatesByPosition.value[pid] || []
 })
-const maxCandidateVotes = computed(() => Math.max(...activeCandidates.value.map((c) => c.votes || 0), 1))
+const totalCandidateVotes = computed(() => activeCandidates.value.reduce((sum, c) => sum + (c.votes || 0), 0))
 const lastSignature = ref(null)
 const voterNotifications = ref([])
 const voterUnread = ref(0)
@@ -479,31 +479,40 @@ onUnmounted(() => {
                   </div>
 
                   <div v-if="activeCandidates.length" class="overflow-x-auto">
-                    <div class="flex gap-6 pb-2 min-h-[320px]">
+                    <div class="flex gap-4 pb-2 min-h-[320px]">
                       <div
                         v-for="cand in activeCandidates"
                         :key="cand.id"
-                        class="bg-white border border-[rgba(196,151,60,0.35)] rounded-2xl shadow-sm p-4 flex flex-col gap-3 min-w-[320px]"
+                        class="bg-[#f7f8fa] border border-slate-200 rounded-2xl shadow-sm p-3 flex flex-col gap-3 min-w-[240px] max-w-[260px]"
                       >
-                        <div class="flex items-start gap-4">
-                          <div class="rounded-xl overflow-hidden bg-slate-100 border border-slate-200 h-[220px] w-[220px] flex-shrink-0">
-                            <img :src="cand.photo_url || candidatePlaceholder" alt="Candidate" class="h-full w-full object-cover" />
-                          </div>
-                          <div class="flex flex-col items-center gap-2 mt-1">
-                            <span class="text-xs text-slate-700 font-semibold whitespace-nowrap">{{ (cand.votes || 0) }} vote(s)</span>
-                            <div class="w-8 h-[180px] rounded-lg overflow-hidden border border-[rgba(196,151,60,0.5)] bg-slate-100 flex items-end">
-                              <div
-                                class="w-full bg-gradient-to-b from-[var(--hcad-navy)] to-[var(--hcad-gold)]"
-                                :style="{
-                                  height: Math.max(14, ((cand.votes || 0) / maxCandidateVotes) * 180) + 'px'
-                                }"
-                              ></div>
-                            </div>
-                          </div>
+                        <div class="rounded-xl overflow-hidden bg-white border border-slate-200 h-[200px] w-full">
+                          <img :src="cand.photo_url || candidatePlaceholder" alt="Candidate" class="h-full w-full object-cover" />
                         </div>
-                        <div>
-                          <p class="text-xl font-semibold text-slate-900 leading-tight">{{ cand.full_name }}</p>
-                          <p class="text-sm text-slate-600">Batch {{ cand.batch_year || 'N/A' }}</p>
+                        <div class="space-y-1">
+                          <p class="text-base font-semibold text-slate-900 leading-tight">{{ cand.full_name }}</p>
+                          <p class="text-[13px] text-slate-600">Batch {{ cand.batch_year || 'N/A' }}</p>
+                          <p class="text-[12px] text-slate-500">{{ cand.campus_chapter || 'Campus/Chapter not set' }}</p>
+                        </div>
+                        <div class="space-y-1">
+                          <p class="text-lg font-semibold text-slate-900">{{ (cand.votes || 0) === 1 ? '1 vote' : `${cand.votes || 0} votes` }}</p>
+                          <div class="w-full h-3 rounded-full bg-slate-200 overflow-hidden border border-slate-300/70">
+                            <div
+                              class="h-full bg-gradient-to-r from-[var(--hcad-gold)] to-[var(--hcad-navy)]"
+                              :style="{
+                                width:
+                                  (totalCandidateVotes
+                                    ? Math.min(100, Math.round(((cand.votes || 0) / totalCandidateVotes) * 100))
+                                    : 0) + '%'
+                              }"
+                            ></div>
+                          </div>
+                          <p class="text-[11px] text-slate-600 font-semibold">
+                            {{
+                              totalCandidateVotes
+                                ? Math.min(100, Math.round(((cand.votes || 0) / totalCandidateVotes) * 100))
+                                : 0
+                            }}%
+                          </p>
                         </div>
                       </div>
                     </div>
